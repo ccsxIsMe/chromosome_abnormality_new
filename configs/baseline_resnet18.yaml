@@ -1,0 +1,40 @@
+experiment_name: baseline_resnet18_ce
+
+seed: 42
+device: cuda
+
+data:
+  train_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/train_pair.csv
+  val_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/val_pair.csv
+  test_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/test_pair.csv
+  image_size: 300
+  num_workers: 4
+
+model:
+  name: resnet18
+  num_classes: 2
+  pretrained: false
+  use_chromosome_id: false
+  use_pair_input: true
+  chr_embed_dim: 16
+
+train:
+  batch_size: 32
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.0001
+
+loss:
+  name: ce # ce focal
+  class_weights: null
+  # class_weights: [0.5111, 23.0]
+  focal_gamma: 2.0
+
+optimizer:
+  name: adamw
+
+scheduler:
+  name: cosine
+
+output:
+  save_dir: /data5/chensx/MyProject/chromosome_abnormality_new/outputs/experiments

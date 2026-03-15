@@ -1,0 +1,44 @@
+# scheme1_single_image_random.yaml
+
+experiment_name: scheme1_single_image_random
+
+seed: 42
+device: cuda
+
+data:
+  train_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized_balenced/scheme1_single_image_random/train.csv
+  val_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized_balenced/scheme1_single_image_random/val.csv
+  test_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized_balenced/scheme1_single_image_random/test.csv
+  image_size: 300
+  num_workers: 4
+
+model:
+  name: resnet18
+  num_classes: 2
+  pretrained: true
+  use_chromosome_id: false
+  use_pair_input: false
+  chr_embed_dim: 16
+
+train:
+  batch_size: 128
+  epochs: 30
+  lr: 0.0001
+  weight_decay: 0.0001
+
+
+loss:
+  name: ce
+  class_weights: null # [1.0, 20.0] [1.0, 10.0]
+  focal_gamma: 2.0
+
+optimizer:
+  name: adamw
+  lr: 1e-4
+  weight_decay: 1e-5
+
+scheduler:
+  name: cosine
+
+output:
+  save_dir: /data5/chensx/MyProject/chromosome_abnormality_new/outputs/experiments
