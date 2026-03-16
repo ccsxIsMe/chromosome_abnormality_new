@@ -1,21 +1,20 @@
-# export HF_ENDPOINT=https://hf-mirror.com
-
 import os
-from xml.parsers.expat import model
-import yaml
-import torch
+from copy import deepcopy
+
 import numpy as np
-from tqdm import tqdm
-from torch.utils.data import DataLoader
+import torch
+import yaml
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from src.datasets.chromosome_dataset import ChromosomeDataset
-from src.transforms import build_train_transform, build_val_transform
-from src.models.build_model import build_model
 from src.losses.loss_factory import build_loss
-from src.utils.metrics import compute_classification_metrics, search_best_threshold
+from src.models.build_model import build_model
+from src.transforms import build_train_transform, build_val_transform
 from src.utils.chromosome_vocab import build_chr_vocab_from_csv
+from src.utils.metrics import compute_classification_metrics, search_best_threshold
 
 
 def load_config(path):
@@ -25,14 +24,14 @@ def load_config(path):
 
 def set_seed(seed=42):
     import random
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device,
-                    use_chromosome_id=False, use_pair_input=False):
+def train_one_epoch(model, loader, criterion, optimizer, device, use_chromosome_id=False, use_pair_input=False):
     model.train()
     running_loss = 0.0
 
@@ -69,9 +68,9 @@ def train_one_epoch(model, loader, criterion, optimizer, device,
 
     return running_loss / len(loader.dataset)
 
+
 @torch.no_grad()
-def evaluate(model, loader, criterion, device, threshold=0.5,
-             use_chromosome_id=False, use_pair_input=False):
+def evaluate(model, loader, criterion, device, threshold=0.5, use_chromosome_id=False, use_pair_input=False):
     model.eval()
     running_loss = 0.0
     y_true, y_prob = [], []
@@ -111,10 +110,66 @@ def evaluate(model, loader, criterion, device, threshold=0.5,
 
     return metrics, y_true, y_prob
 
-def main(config_path):
-    cfg = load_config(config_path)
-    set_seed(cfg["seed"])
 
+def build_datasets(cfg, chr_to_idx):
+    use_chromosome_id = cfg["model"].get("use_chromosome_id", False)
+    use_pair_input = cfg["model"].get("use_pair_input", False)
+
+    if use_pair_input:
+        from src.datasets.chromosome_pair_dataset import ChromosomePairDataset
+
+        dataset_cls = ChromosomePairDataset
+    else:
+        dataset_cls = ChromosomeDataset
+
+    train_dataset = dataset_cls(
+        cfg["data"]["train_csv"],
+        transform=build_train_transform(cfg["data"]["image_size"]),
+        chr_to_idx=chr_to_idx,
+        use_chromosome_id=use_chromosome_id,
+    )
+    val_dataset = dataset_cls(
+        cfg["data"]["val_csv"],
+        transform=build_val_transform(cfg["data"]["image_size"]),
+        chr_to_idx=chr_to_idx,
+        use_chromosome_id=use_chromosome_id,
+    )
+    test_dataset = dataset_cls(
+        cfg["data"]["test_csv"],
+        transform=build_val_transform(cfg["data"]["image_size"]),
+        chr_to_idx=chr_to_idx,
+        use_chromosome_id=use_chromosome_id,
+    )
+    return train_dataset, val_dataset, test_dataset
+
+
+def build_loaders(cfg, train_dataset, val_dataset, test_dataset):
+    batch_size = cfg["train"]["batch_size"]
+    num_workers = cfg["data"]["num_workers"]
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+    )
+    return train_loader, val_loader, test_loader
+
+
+def build_training_context(cfg):
+    set_seed(cfg["seed"])
     device = torch.device(cfg["device"] if torch.cuda.is_available() else "cpu")
 
     use_chromosome_id = cfg["model"].get("use_chromosome_id", False)
@@ -122,71 +177,13 @@ def main(config_path):
     pair_model_type = cfg["model"].get("pair_model_type", "siamese")
 
     chr_to_idx = None
-    idx_to_chr = None
     if use_chromosome_id:
-        chr_to_idx, idx_to_chr = build_chr_vocab_from_csv(cfg["data"]["train_csv"])
+        chr_to_idx, _ = build_chr_vocab_from_csv(cfg["data"]["train_csv"])
 
     print("Chromosome vocab:", chr_to_idx)
 
-    if use_pair_input:
-        from src.datasets.chromosome_pair_dataset import ChromosomePairDataset
-
-        train_dataset = ChromosomePairDataset(
-            cfg["data"]["train_csv"],
-            transform=build_train_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-        val_dataset = ChromosomePairDataset(
-            cfg["data"]["val_csv"],
-            transform=build_val_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-        test_dataset = ChromosomePairDataset(
-            cfg["data"]["test_csv"],
-            transform=build_val_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-    else:
-        train_dataset = ChromosomeDataset(
-            cfg["data"]["train_csv"],
-            transform=build_train_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-        val_dataset = ChromosomeDataset(
-            cfg["data"]["val_csv"],
-            transform=build_val_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-        test_dataset = ChromosomeDataset(
-            cfg["data"]["test_csv"],
-            transform=build_val_transform(cfg["data"]["image_size"]),
-            chr_to_idx=chr_to_idx,
-            use_chromosome_id=use_chromosome_id,
-        )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=cfg["train"]["batch_size"],
-        shuffle=True,
-        num_workers=cfg["data"]["num_workers"]
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=cfg["train"]["batch_size"],
-        shuffle=False,
-        num_workers=cfg["data"]["num_workers"]
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=cfg["train"]["batch_size"],
-        shuffle=False,
-        num_workers=cfg["data"]["num_workers"]
-    )
+    train_dataset, val_dataset, test_dataset = build_datasets(cfg, chr_to_idx)
+    train_loader, val_loader, test_loader = build_loaders(cfg, train_dataset, val_dataset, test_dataset)
 
     model = build_model(
         model_name=cfg["model"]["name"],
@@ -200,13 +197,53 @@ def main(config_path):
     ).to(device)
 
     criterion = build_loss(cfg["loss"], device)
-
     optimizer = AdamW(
         model.parameters(),
         lr=cfg["train"]["lr"],
-        weight_decay=cfg["train"]["weight_decay"]
+        weight_decay=cfg["train"]["weight_decay"],
     )
     scheduler = CosineAnnealingLR(optimizer, T_max=cfg["train"]["epochs"])
+
+    return {
+        "device": device,
+        "use_chromosome_id": use_chromosome_id,
+        "use_pair_input": use_pair_input,
+        "train_loader": train_loader,
+        "val_loader": val_loader,
+        "test_loader": test_loader,
+        "model": model,
+        "criterion": criterion,
+        "optimizer": optimizer,
+        "scheduler": scheduler,
+    }
+
+
+def to_serializable(value):
+    if isinstance(value, dict):
+        return {k: to_serializable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_serializable(v) for v in value]
+    if isinstance(value, tuple):
+        return [to_serializable(v) for v in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def run_experiment(cfg, config_path=None):
+    cfg = deepcopy(cfg)
+    context = build_training_context(cfg)
+
+    device = context["device"]
+    use_chromosome_id = context["use_chromosome_id"]
+    use_pair_input = context["use_pair_input"]
+    train_loader = context["train_loader"]
+    val_loader = context["val_loader"]
+    test_loader = context["test_loader"]
+    model = context["model"]
+    criterion = context["criterion"]
+    optimizer = context["optimizer"]
+    scheduler = context["scheduler"]
 
     save_dir = os.path.join(cfg["output"]["save_dir"], cfg["experiment_name"])
     os.makedirs(save_dir, exist_ok=True)
@@ -219,16 +256,23 @@ def main(config_path):
         print(f"Epoch {epoch + 1}/{cfg['train']['epochs']}")
 
         train_loss = train_one_epoch(
-            model, train_loader, criterion, optimizer, device,
+            model,
+            train_loader,
+            criterion,
+            optimizer,
+            device,
             use_chromosome_id=use_chromosome_id,
-            use_pair_input=use_pair_input
+            use_pair_input=use_pair_input,
         )
 
         val_metrics, y_true, y_prob = evaluate(
-            model, val_loader, criterion, device,
+            model,
+            val_loader,
+            criterion,
+            device,
             threshold=0.5,
             use_chromosome_id=use_chromosome_id,
-            use_pair_input=use_pair_input
+            use_pair_input=use_pair_input,
         )
 
         best_th, best_score, best_stats = search_best_threshold(y_true, y_prob, metric="f1")
@@ -239,6 +283,8 @@ def main(config_path):
         print(f"Best Val Threshold: {best_th:.2f}, Best F1: {best_score:.4f}, Stats: {best_stats}")
 
         current_metric = val_metrics[best_metric_name]
+        if current_metric is None:
+            current_metric = -1.0
 
         if current_metric > best_metric:
             best_metric = current_metric
@@ -248,24 +294,28 @@ def main(config_path):
     print("Loading best model for final test...")
     model.load_state_dict(torch.load(best_path, map_location=device))
 
-    # 在 val 上重新找 best threshold
-    val_metrics, val_y_true, val_y_prob = evaluate(
-        model, val_loader, criterion, device,
+    val_metrics_05, val_y_true, val_y_prob = evaluate(
+        model,
+        val_loader,
+        criterion,
+        device,
         threshold=0.5,
         use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input
+        use_pair_input=use_pair_input,
     )
     best_th, best_score, best_stats = search_best_threshold(val_y_true, val_y_prob, metric="f1")
 
     print(f"\nBest threshold selected from val: {best_th:.2f}")
     print(f"Best val stats: {best_stats}")
 
-    # test @ 0.5
     test_metrics_05, _, _ = evaluate(
-        model, test_loader, criterion, device,
+        model,
+        test_loader,
+        criterion,
+        device,
         threshold=0.5,
         use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input
+        use_pair_input=use_pair_input,
     )
 
     print("\nFinal Test Metrics @ threshold=0.5:")
@@ -275,23 +325,23 @@ def main(config_path):
     print(f"Balanced Accuracy: {test_metrics_05['balanced_acc']}")
     print(f"Loss: {test_metrics_05['loss']}")
 
-    cm = test_metrics_05["confusion_matrix"]
+    cm_05 = test_metrics_05["confusion_matrix"]
     print("\nConfusion Matrix @0.5:")
-    print(f"TN: {cm['tn']}, FP: {cm['fp']}")
-    print(f"FN: {cm['fn']}, TP: {cm['tp']}")
-
+    print(f"TN: {cm_05['tn']}, FP: {cm_05['fp']}")
+    print(f"FN: {cm_05['fn']}, TP: {cm_05['tp']}")
     print("\nNormal Class Metrics @0.5:")
     print(test_metrics_05["normal"])
-
     print("\nAbnormal Class Metrics @0.5:")
     print(test_metrics_05["abnormal"])
 
-    # test @ best threshold
     test_metrics_best, _, _ = evaluate(
-        model, test_loader, criterion, device,
+        model,
+        test_loader,
+        criterion,
+        device,
         threshold=best_th,
         use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input
+        use_pair_input=use_pair_input,
     )
 
     print(f"\nFinal Test Metrics @ threshold={best_th:.2f}:")
@@ -301,19 +351,46 @@ def main(config_path):
     print(f"Balanced Accuracy: {test_metrics_best['balanced_acc']}")
     print(f"Loss: {test_metrics_best['loss']}")
 
-    cm = test_metrics_best["confusion_matrix"]
+    cm_best = test_metrics_best["confusion_matrix"]
     print(f"\nConfusion Matrix @{best_th:.2f}:")
-    print(f"TN: {cm['tn']}, FP: {cm['fp']}")
-    print(f"FN: {cm['fn']}, TP: {cm['tp']}")
-
+    print(f"TN: {cm_best['tn']}, FP: {cm_best['fp']}")
+    print(f"FN: {cm_best['fn']}, TP: {cm_best['tp']}")
     print(f"\nNormal Class Metrics @{best_th:.2f}:")
     print(test_metrics_best["normal"])
-
     print(f"\nAbnormal Class Metrics @{best_th:.2f}:")
     print(test_metrics_best["abnormal"])
 
+    results = {
+        "config_path": config_path,
+        "experiment_name": cfg["experiment_name"],
+        "save_dir": save_dir,
+        "best_model_path": best_path,
+        "best_model_metric": best_metric_name,
+        "best_model_metric_value": best_metric,
+        "best_threshold": best_th,
+        "best_threshold_score": best_score,
+        "best_threshold_stats": best_stats,
+        "val_metrics_05": val_metrics_05,
+        "test_metrics_05": test_metrics_05,
+        "test_metrics_best": test_metrics_best,
+    }
+
+    results_path = os.path.join(save_dir, "results.yaml")
+    with open(results_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(to_serializable(results), f, allow_unicode=True, sort_keys=False)
+    print(f"Saved results to {results_path}")
+
+    return results
+
+
+def main(config_path):
+    cfg = load_config(config_path)
+    return run_experiment(cfg, config_path=config_path)
+
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
     args = parser.parse_args()
