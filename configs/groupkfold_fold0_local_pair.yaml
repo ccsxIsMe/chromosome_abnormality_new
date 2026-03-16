@@ -1,14 +1,14 @@
 # scheme3_pair_level.yaml
 
-experiment_name: scheme3_pair_level
+experiment_name: groupkfold_fold0_local_pair
 
 seed: 42
 device: cuda
 
 data:
-  train_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized/scheme3_pair_level/train_pair.csv
-  val_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized/scheme3_pair_level/val_pair.csv
-  test_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_randomized/scheme3_pair_level/test_pair.csv
+  train_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_cv/group_kfold_pair/fold_0/train_pair.csv
+  val_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_cv/group_kfold_pair/fold_0/val_pair.csv
+  test_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data_cv/group_kfold_pair/fold_0/test_pair.csv
   image_size: 300
   num_workers: 4
 
