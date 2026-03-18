@@ -195,6 +195,9 @@ def build_training_context(cfg):
         chr_embed_dim=cfg["model"].get("chr_embed_dim", 16),
         use_pair_input=use_pair_input,
         pair_model_type=pair_model_type,
+        use_pair_mixstyle=cfg["model"].get("use_pair_mixstyle", False),
+        mixstyle_p=cfg["model"].get("mixstyle_p", 0.5),
+        mixstyle_alpha=cfg["model"].get("mixstyle_alpha", 0.1),
     ).to(device)
 
     criterion = build_loss(cfg["loss"], device)

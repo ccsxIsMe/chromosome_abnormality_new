@@ -15,6 +15,9 @@ def build_model(
     chr_embed_dim: int = 16,
     use_pair_input: bool = False,
     pair_model_type: str = "siamese",
+    use_pair_mixstyle: bool = False,
+    mixstyle_p: float = 0.5,
+    mixstyle_alpha: float = 0.1,
 ):
     if use_pair_input:
         if pair_model_type == "siamese":
@@ -42,6 +45,9 @@ def build_model(
                 use_chromosome_id=use_chromosome_id,
                 num_chromosome_types=num_chromosome_types,
                 chr_embed_dim=chr_embed_dim,
+                use_pair_mixstyle=use_pair_mixstyle,
+                mixstyle_p=mixstyle_p,
+                mixstyle_alpha=mixstyle_alpha,
             )
 
         raise ValueError(f"Unsupported pair_model_type: {pair_model_type}")

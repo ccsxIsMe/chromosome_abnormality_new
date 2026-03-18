@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from src.models.local_pair_comparator import ResNetFeatureExtractor
+from src.models.pair_mixstyle import PairMixStyle
 
 
 class LocalGlobalPairComparator(nn.Module):
@@ -18,15 +19,20 @@ class LocalGlobalPairComparator(nn.Module):
         use_chromosome_id=False,
         num_chromosome_types=None,
         chr_embed_dim=16,
+        use_pair_mixstyle=False,
+        mixstyle_p=0.5,
+        mixstyle_alpha=0.1,
     ):
         super().__init__()
 
         self.use_chromosome_id = use_chromosome_id
+        self.use_pair_mixstyle = use_pair_mixstyle
         self.encoder = ResNetFeatureExtractor(
             backbone_name=backbone_name,
             pretrained=pretrained,
         )
         encoder_channels = self.encoder.out_channels
+        self.pair_mixstyle = PairMixStyle(p=mixstyle_p, alpha=mixstyle_alpha) if use_pair_mixstyle else None
 
         self.feature_proj = nn.Sequential(
             nn.Conv2d(encoder_channels, proj_dim, kernel_size=1, bias=False),
@@ -105,6 +111,9 @@ class LocalGlobalPairComparator(nn.Module):
     def forward(self, left_image, right_image, chr_idx=None, return_attention=False):
         left_feat = self.feature_proj(self.encoder(left_image))
         right_feat = self.feature_proj(self.encoder(right_image))
+
+        if self.pair_mixstyle is not None:
+            left_feat, right_feat = self.pair_mixstyle(left_feat, right_feat)
 
         local_diff = torch.abs(left_feat - right_feat)
         local_mul = left_feat * right_feat
