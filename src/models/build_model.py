@@ -1,7 +1,9 @@
 import timm
+
 from src.models.chr_cond_model import ChromosomeConditionalClassifier
-from src.models.siamese_pair_model import SiamesePairClassifier
+from src.models.local_global_pair_comparator import LocalGlobalPairComparator
 from src.models.local_pair_comparator import LocalPairComparator
+from src.models.siamese_pair_model import SiamesePairClassifier
 
 
 def build_model(
@@ -16,7 +18,7 @@ def build_model(
 ):
     if use_pair_input:
         if pair_model_type == "siamese":
-            model = SiamesePairClassifier(
+            return SiamesePairClassifier(
                 backbone_name=model_name,
                 num_classes=num_classes,
                 pretrained=pretrained,
@@ -24,32 +26,36 @@ def build_model(
                 num_chromosome_types=num_chromosome_types,
                 chr_embed_dim=chr_embed_dim,
             )
-            return model
 
-        elif pair_model_type == "local":
-            # 这一版 local comparator 暂时不接 chromosome id
-            model = LocalPairComparator(
+        if pair_model_type == "local":
+            return LocalPairComparator(
                 backbone_name=model_name,
                 num_classes=num_classes,
                 pretrained=pretrained,
             )
-            return model
 
-        else:
-            raise ValueError(f"Unsupported pair_model_type: {pair_model_type}")
+        if pair_model_type == "local_global":
+            return LocalGlobalPairComparator(
+                backbone_name=model_name,
+                num_classes=num_classes,
+                pretrained=pretrained,
+                use_chromosome_id=use_chromosome_id,
+                num_chromosome_types=num_chromosome_types,
+                chr_embed_dim=chr_embed_dim,
+            )
+
+        raise ValueError(f"Unsupported pair_model_type: {pair_model_type}")
 
     if use_chromosome_id:
         if num_chromosome_types is None:
             raise ValueError("num_chromosome_types must be provided when use_chromosome_id=True")
 
-        model = ChromosomeConditionalClassifier(
+        return ChromosomeConditionalClassifier(
             backbone_name=model_name,
             num_classes=num_classes,
             pretrained=pretrained,
             num_chromosome_types=num_chromosome_types,
             chr_embed_dim=chr_embed_dim,
         )
-        return model
 
-    model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
-    return model
+    return timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)

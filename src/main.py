@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.datasets.chromosome_dataset import ChromosomeDataset
-from src.losses.loss_factory import build_loss
+from src.losses.loss_factory import build_loss, extract_logits
 from src.models.build_model import build_model
 from src.transforms import build_train_transform, build_val_transform
 from src.utils.chromosome_vocab import build_chr_vocab_from_csv
@@ -46,20 +46,20 @@ def train_one_epoch(model, loader, criterion, optimizer, device, use_chromosome_
 
             if use_chromosome_id:
                 chr_idx = batch["chr_idx"].to(device)
-                logits = model(left_images, right_images, chr_idx)
+                model_output = model(left_images, right_images, chr_idx)
             else:
-                logits = model(left_images, right_images)
+                model_output = model(left_images, right_images)
 
         elif use_chromosome_id:
             images = batch["image"].to(device)
             chr_idx = batch["chr_idx"].to(device)
-            logits = model(images, chr_idx)
+            model_output = model(images, chr_idx)
 
         else:
             images = batch["image"].to(device)
-            logits = model(images)
+            model_output = model(images)
 
-        loss = criterion(logits, labels)
+        loss = criterion(model_output, labels)
         loss.backward()
         optimizer.step()
 
@@ -84,20 +84,21 @@ def evaluate(model, loader, criterion, device, threshold=0.5, use_chromosome_id=
 
             if use_chromosome_id:
                 chr_idx = batch["chr_idx"].to(device)
-                logits = model(left_images, right_images, chr_idx)
+                model_output = model(left_images, right_images, chr_idx)
             else:
-                logits = model(left_images, right_images)
+                model_output = model(left_images, right_images)
 
         elif use_chromosome_id:
             images = batch["image"].to(device)
             chr_idx = batch["chr_idx"].to(device)
-            logits = model(images, chr_idx)
+            model_output = model(images, chr_idx)
 
         else:
             images = batch["image"].to(device)
-            logits = model(images)
+            model_output = model(images)
 
-        loss = criterion(logits, labels)
+        logits = extract_logits(model_output)
+        loss = criterion(model_output, labels)
         probs = torch.softmax(logits, dim=1)[:, 1]
 
         batch_size = labels.size(0)
