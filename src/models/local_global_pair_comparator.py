@@ -27,6 +27,8 @@ class LocalGlobalPairComparator(nn.Module):
 
         self.use_chromosome_id = use_chromosome_id
         self.use_pair_mixstyle = use_pair_mixstyle
+        self.embedding_dim = hidden_dim
+
         self.encoder = ResNetFeatureExtractor(
             backbone_name=backbone_name,
             pretrained=pretrained,

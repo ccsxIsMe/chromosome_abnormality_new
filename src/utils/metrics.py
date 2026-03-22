@@ -10,20 +10,26 @@ from sklearn.metrics import (
 )
 
 
-def compute_classification_metrics(y_true, y_prob, threshold=0.5):
+def _compute_binary_metrics_from_scores(y_true, y_score, threshold=0.5, higher_score_more_positive=True):
     y_true = np.array(y_true)
-    y_prob = np.array(y_prob)
-    y_pred = (y_prob >= threshold).astype(int)
+    y_score = np.array(y_score)
+
+    if higher_score_more_positive:
+        y_pred = (y_score >= threshold).astype(int)
+        pos_score = y_score
+    else:
+        y_pred = (y_score <= threshold).astype(int)
+        pos_score = -y_score
 
     metrics = {}
 
     try:
-        metrics["auroc"] = roc_auc_score(y_true, y_prob)
+        metrics["auroc"] = roc_auc_score(y_true, pos_score)
     except Exception:
         metrics["auroc"] = None
 
     try:
-        metrics["auprc"] = average_precision_score(y_true, y_prob)
+        metrics["auprc"] = average_precision_score(y_true, pos_score)
     except Exception:
         metrics["auprc"] = None
 
@@ -75,37 +81,89 @@ def compute_classification_metrics(y_true, y_prob, threshold=0.5):
     return metrics
 
 
-def search_best_threshold(y_true, y_prob, metric="f1"):
+def compute_classification_metrics(y_true, y_prob, threshold=0.5):
+    return _compute_binary_metrics_from_scores(
+        y_true=y_true,
+        y_score=y_prob,
+        threshold=threshold,
+        higher_score_more_positive=True,
+    )
+
+
+def compute_score_based_metrics(y_true, y_score, threshold=0.5, higher_score_more_positive=True):
+    return _compute_binary_metrics_from_scores(
+        y_true=y_true,
+        y_score=y_score,
+        threshold=threshold,
+        higher_score_more_positive=higher_score_more_positive,
+    )
+
+
+def _build_threshold_candidates(y_score, max_points=200):
+    y_score = np.array(y_score, dtype=np.float64)
+    y_score = y_score[np.isfinite(y_score)]
+
+    if y_score.size == 0:
+        return np.array([0.5], dtype=np.float64)
+
+    unique_scores = np.unique(y_score)
+    if unique_scores.size <= max_points:
+        return unique_scores
+
+    lo = float(unique_scores.min())
+    hi = float(unique_scores.max())
+
+    if lo == hi:
+        return np.array([lo], dtype=np.float64)
+
+    return np.linspace(lo, hi, num=max_points)
+
+
+def search_best_threshold(y_true, y_score, metric="f1", higher_score_more_positive=True):
     y_true = np.array(y_true)
-    y_prob = np.array(y_prob)
+    y_score = np.array(y_score)
 
     best_threshold = 0.5
     best_score = -1
     best_stats = {}
 
-    thresholds = np.arange(0.01, 1.00, 0.01)
+    thresholds = _build_threshold_candidates(y_score)
 
     for th in thresholds:
-        y_pred = (y_prob >= th).astype(int)
+        if higher_score_more_positive:
+            y_pred = (y_score >= th).astype(int)
+            auc_score_input = y_score
+        else:
+            y_pred = (y_score <= th).astype(int)
+            auc_score_input = -y_score
 
         precision = precision_score(y_true, y_pred, zero_division=0)
         recall = recall_score(y_true, y_pred, zero_division=0)
         f1 = f1_score(y_true, y_pred, zero_division=0)
+        bal_acc = balanced_accuracy_score(y_true, y_pred)
 
         if metric == "f1":
             score = f1
         elif metric == "recall":
             score = recall
+        elif metric == "balanced_acc":
+            score = bal_acc
+        elif metric == "auprc":
+            try:
+                score = average_precision_score(y_true, auc_score_input)
+            except Exception:
+                score = -1
         else:
             raise ValueError(f"Unsupported metric: {metric}")
 
         if score > best_score:
             best_score = score
-            best_threshold = th
+            best_threshold = float(th)
             best_stats = {
-                "precision": precision,
-                "recall": recall,
-                "f1": f1,
+                "precision": float(precision),
+                "recall": float(recall),
+                "f1": float(f1),
+                "balanced_acc": float(bal_acc),
             }
 
     return best_threshold, best_score, best_stats

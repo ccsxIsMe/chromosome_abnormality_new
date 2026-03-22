@@ -17,6 +17,24 @@ def extract_embeddings(model_output):
     return None
 
 
+def extract_anomaly_scores(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("anomaly_score")
+    return None
+
+
+def extract_prototype_distances(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("prototype_distances")
+    return None
+
+
+def extract_all_prototypes(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("all_prototypes")
+    return None
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=None, gamma=2.0, reduction="mean"):
         super().__init__()
@@ -114,6 +132,97 @@ class ClassificationContrastiveLoss(nn.Module):
         return self.cls_weight * cls_term + self.contrastive_weight * contrastive_term
 
 
+class MultiPrototypeMetricLoss(nn.Module):
+    """
+    Loss for multi-prototype metric learning.
+
+    Main idea:
+    - normal samples should be close to at least one prototype of their chromosome type
+    - abnormal samples should be farther than a margin from all type-specific normal prototypes
+    - optional CE auxiliary branch
+    - optional prototype diversity regularization
+    """
+
+    def __init__(
+        self,
+        cls_loss=None,
+        cls_weight=0.5,
+        normal_weight=1.0,
+        abnormal_weight=1.0,
+        abnormal_margin=0.35,
+        diversity_weight=0.05,
+        diversity_margin=0.2,
+        eps=1e-8,
+    ):
+        super().__init__()
+        self.cls_loss = cls_loss
+        self.cls_weight = cls_weight
+        self.normal_weight = normal_weight
+        self.abnormal_weight = abnormal_weight
+        self.abnormal_margin = abnormal_margin
+        self.diversity_weight = diversity_weight
+        self.diversity_margin = diversity_margin
+        self.eps = eps
+
+    def _prototype_diversity_penalty(self, all_prototypes):
+        """
+        all_prototypes: [T, K, D]
+        Encourage different prototypes of one chromosome type to not collapse.
+        """
+        if all_prototypes is None:
+            return None
+
+        protos = F.normalize(all_prototypes, dim=-1)
+        sim = torch.matmul(protos, protos.transpose(-1, -2))  # [T, K, K]
+
+        k = sim.size(-1)
+        eye = torch.eye(k, device=sim.device, dtype=torch.bool).unsqueeze(0)
+        off_diag = sim.masked_select(~eye)
+
+        if off_diag.numel() == 0:
+            return sim.new_tensor(0.0)
+
+        penalty = F.relu(off_diag - self.diversity_margin).mean()
+        return penalty
+
+    def forward(self, model_output, targets):
+        prototype_dists = extract_prototype_distances(model_output)
+        if prototype_dists is None:
+            raise ValueError("MultiPrototypeMetricLoss requires 'prototype_distances' in model output")
+
+        if prototype_dists.ndim != 2:
+            raise ValueError(
+                f"Expected prototype_distances with shape [B, K], got {tuple(prototype_dists.shape)}"
+            )
+
+        min_dist = prototype_dists.min(dim=1).values
+        normal_mask = targets == 0
+        abnormal_mask = targets == 1
+
+        total_loss = min_dist.new_tensor(0.0)
+
+        if self.cls_loss is not None and self.cls_weight > 0:
+            logits = extract_logits(model_output)
+            cls_term = self.cls_loss(logits, targets)
+            total_loss = total_loss + self.cls_weight * cls_term
+
+        if normal_mask.any():
+            normal_term = min_dist[normal_mask].mean()
+            total_loss = total_loss + self.normal_weight * normal_term
+
+        if abnormal_mask.any():
+            abnormal_term = F.relu(self.abnormal_margin - min_dist[abnormal_mask]).mean()
+            total_loss = total_loss + self.abnormal_weight * abnormal_term
+
+        all_prototypes = extract_all_prototypes(model_output)
+        if self.diversity_weight > 0:
+            diversity_term = self._prototype_diversity_penalty(all_prototypes)
+            if diversity_term is not None:
+                total_loss = total_loss + self.diversity_weight * diversity_term
+
+        return total_loss
+
+
 def build_base_classification_loss(loss_cfg, device):
     name = loss_cfg["name"]
 
@@ -132,8 +241,20 @@ def build_base_classification_loss(loss_cfg, device):
     raise ValueError(f"Unsupported loss: {name}")
 
 
-def build_loss(loss_cfg, device):
+def build_loss(loss_cfg, device, experiment_mode="classifier"):
     cls_loss = build_base_classification_loss(loss_cfg, device)
+
+    if experiment_mode == "multi_prototype_metric":
+        metric_cfg = loss_cfg.get("metric", {})
+        return MultiPrototypeMetricLoss(
+            cls_loss=cls_loss,
+            cls_weight=metric_cfg.get("cls_weight", 0.5),
+            normal_weight=metric_cfg.get("normal_weight", 1.0),
+            abnormal_weight=metric_cfg.get("abnormal_weight", 1.0),
+            abnormal_margin=metric_cfg.get("abnormal_margin", 0.35),
+            diversity_weight=metric_cfg.get("diversity_weight", 0.05),
+            diversity_margin=metric_cfg.get("diversity_margin", 0.2),
+        )
 
     aux_cfg = loss_cfg.get("auxiliary")
     if not aux_cfg or not aux_cfg.get("enabled", False):

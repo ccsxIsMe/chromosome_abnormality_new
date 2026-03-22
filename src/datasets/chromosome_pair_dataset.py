@@ -4,11 +4,21 @@ from torch.utils.data import Dataset
 
 
 class ChromosomePairDataset(Dataset):
-    def __init__(self, csv_path, transform=None, chr_to_idx=None, use_chromosome_id=False):
+    def __init__(
+        self,
+        csv_path,
+        transform=None,
+        chr_to_idx=None,
+        use_chromosome_id=False,
+        return_style_view=False,
+        style_transform=None,
+    ):
         self.df = pd.read_csv(csv_path)
         self.transform = transform
         self.chr_to_idx = chr_to_idx
         self.use_chromosome_id = use_chromosome_id
+        self.return_style_view = return_style_view
+        self.style_transform = style_transform
 
         required_cols = ["left_path", "right_path", "label", "chromosome_id"]
         for col in required_cols:
@@ -21,10 +31,13 @@ class ChromosomePairDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        left_img = Image.open(row["left_path"]).convert("RGB")
-        right_img = Image.open(row["right_path"]).convert("RGB")
+        left_img_raw = Image.open(row["left_path"]).convert("RGB")
+        right_img_raw = Image.open(row["right_path"]).convert("RGB")
         label = int(row["label"])
 
+        # main view
+        left_img = left_img_raw.copy()
+        right_img = right_img_raw.copy()
         if self.transform is not None:
             left_img = self.transform(left_img)
             right_img = self.transform(right_img)
@@ -43,6 +56,21 @@ class ChromosomePairDataset(Dataset):
                 raise ValueError("chr_to_idx must be provided when use_chromosome_id=True")
             chr_idx = self.chr_to_idx[str(row["chromosome_id"])]
             sample["chr_idx"] = chr_idx
+
+        # optional style-perturbed second view
+        if self.return_style_view:
+            left_img_style = left_img_raw.copy()
+            right_img_style = right_img_raw.copy()
+
+            if self.style_transform is not None:
+                left_img_style = self.style_transform(left_img_style)
+                right_img_style = self.style_transform(right_img_style)
+            elif self.transform is not None:
+                left_img_style = self.transform(left_img_style)
+                right_img_style = self.transform(right_img_style)
+
+            sample["left_image_style"] = left_img_style
+            sample["right_image_style"] = right_img_style
 
         optional_cols = [
             "case_id",

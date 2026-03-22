@@ -1,0 +1,44 @@
+experiment_name: local_global_pair_resnet18_chrid_prototype_metric
+
+experiment_mode: prototype_metric
+
+seed: 42
+device: cuda
+
+data:
+  train_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/train_pair.csv
+  val_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/val_pair.csv
+  test_csv: /data5/chensx/MyProject/chromosome_abnormality_new/data/test_pair.csv
+  image_size: 300
+  num_workers: 4
+
+model:
+  name: resnet18
+  num_classes: 2
+  pretrained: true
+  use_chromosome_id: true
+  use_pair_input: true
+  pair_model_type: local_global
+  chr_embed_dim: 16
+
+train:
+  batch_size: 128
+  epochs: 40
+  lr: 0.0001
+  weight_decay: 0.0001
+
+loss:
+  name: ce
+  class_weights: [1.0, 20.0]
+  focal_gamma: 2.0
+
+prototype:
+  distance: cosine
+  normalize_embedding: true
+  fit_on: normal_only
+  fallback: global_normal
+
+output:
+  save_dir: /data5/chensx/MyProject/chromosome_abnormality_new/outputs/experiments
+
+best_model_metric: auprc
