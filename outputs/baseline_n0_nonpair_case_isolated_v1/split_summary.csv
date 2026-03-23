@@ -1,0 +1,4 @@
+﻿"split","total_images","abnormal_images","normal_images","total_cases","abnormal_cases","seen_abnormal_subtypes","unseen_abnormal_subtypes"
+"train","25162","547","24615","20","20","19","0"
+"val","4738","103","4635","6","6","4","2"
+"test","4784","104","4680","6","6","3","3"
