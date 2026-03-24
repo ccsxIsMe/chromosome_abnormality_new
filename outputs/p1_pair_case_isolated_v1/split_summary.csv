@@ -1,0 +1,4 @@
+﻿"split","total_pairs","normal_pairs","abnormal_pairs","total_cases","abnormal_cases","abnormal_subtypes_present"
+"train","12305","11814","491","20","18","17"
+"val","2359","2256","103","6","6","6"
+"test","2325","2221","104","6","6","6"
