@@ -10,6 +10,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from src.datasets.chromosome_dataset import ChromosomeDataset
 from src.losses.loss_factory import (
     build_loss,

@@ -5,9 +5,9 @@ import pandas as pd
 
 
 DEFAULT_PAIR_CSVS = [
-    Path("data_randomized/scheme3_pair_level/train_pair.csv"),
-    Path("data_randomized/scheme3_pair_level/val_pair.csv"),
-    Path("data_randomized/scheme3_pair_level/test_pair.csv"),
+    Path("/data5/chensx/MyProject/chromosome_abnormality_new/data/train.csv"),
+    Path("/data5/chensx/MyProject/chromosome_abnormality_new/data/val.csv"),
+    Path("/data5/chensx/MyProject/chromosome_abnormality_new/data/test.csv"),
 ]
 
 
