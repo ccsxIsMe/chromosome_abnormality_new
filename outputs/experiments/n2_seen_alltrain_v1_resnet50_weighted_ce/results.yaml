@@ -1,0 +1,211 @@
+experiment_mode: classifier
+config_path: configs/n2_seen_alltrain_v1_resnet50_weighted_ce.yaml
+experiment_name: n2_seen_alltrain_v1_resnet50_weighted_ce
+save_dir: outputs/experiments/n2_seen_alltrain_v1_resnet50_weighted_ce
+best_model_path: outputs/experiments/n2_seen_alltrain_v1_resnet50_weighted_ce/best_model.pth
+best_model_metric: macro_f1
+best_model_metric_value: 0.9833333333333334
+val_metrics:
+  top1_acc: 0.9803921568627451
+  macro_f1: 0.9833333333333334
+  balanced_acc: 0.96875
+  top3_acc: 1.0
+  per_class:
+    '0':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 21
+    '1':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '2':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '3':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 12
+    '4':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '5':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '6':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '7':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '8':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '9':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 10
+    '10':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '11':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '12':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '13':
+      precision: 1.0
+      recall: 0.875
+      f1: 0.9333333333333333
+      support: 8
+    '14':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '15':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '16':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '17':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '18':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+  loss: 0.11911327421080832
+test_metrics:
+  top1_acc: 1.0
+  macro_f1: 1.0
+  balanced_acc: 1.0
+  top3_acc: 1.0
+  per_class:
+    '0':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '1':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '2':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '3':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '4':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '5':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '6':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '7':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '8':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 4
+    '9':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 10
+    '10':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '11':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '12':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '13':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '14':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '15':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 6
+    '16':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '17':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '18':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+  loss: 0.017412795359268783
