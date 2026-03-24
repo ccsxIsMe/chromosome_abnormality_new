@@ -1,0 +1,81 @@
+experiment_mode: classifier
+config_path: configs/n2_seen_only_v1_resnet50_weighted_ce.yaml
+experiment_name: n2_seen_only_v1_resnet50_weighted_ce
+save_dir: outputs/experiments/n2_seen_only_v1_resnet50_weighted_ce
+best_model_path: outputs/experiments/n2_seen_only_v1_resnet50_weighted_ce/best_model.pth
+best_model_metric: macro_f1
+best_model_metric_value: 1.0
+val_metrics:
+  top1_acc: 1.0
+  macro_f1: 1.0
+  balanced_acc: 1.0
+  top3_acc: 1.0
+  per_class:
+    '0':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 21
+    '1':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 10
+    '2':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 8
+    '3':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '4':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 12
+    '5':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+  loss: 0.28157249129578177
+test_metrics:
+  top1_acc: 0.95
+  macro_f1: 0.9824561403508772
+  balanced_acc: 0.9666666666666667
+  top3_acc: 1.0
+  per_class:
+    '0':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '1':
+      precision: 1.0
+      recall: 0.9
+      f1: 0.9473684210526316
+      support: 10
+    '2':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '3':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 6
+    '4':
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      support: 0
+    '5':
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+      support: 4
+  loss: 0.3894603192806244
