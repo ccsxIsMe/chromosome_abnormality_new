@@ -1,0 +1,4 @@
+﻿"split","total_images","total_cases","classes_present"
+"train","547","20","19"
+"val","51","4","4"
+"test","20","3","3"

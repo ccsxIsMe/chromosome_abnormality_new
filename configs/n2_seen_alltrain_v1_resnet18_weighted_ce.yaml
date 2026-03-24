@@ -1,0 +1,35 @@
+experiment_name: n2_seen_alltrain_v1_resnet18_weighted_ce
+
+seed: 42
+device: cuda
+
+data:
+  train_csv: data_protocol/n2_seen_alltrain_v1/train.csv
+  val_csv: data_protocol/n2_seen_alltrain_v1/val.csv
+  test_csv: data_protocol/n2_seen_alltrain_v1/test.csv
+  image_size: 300
+  num_workers: 4
+
+model:
+  name: resnet18
+  num_classes: 19
+  pretrained: true
+  use_chromosome_id: false
+  use_pair_input: false
+  chr_embed_dim: 16
+
+train:
+  batch_size: 32
+  epochs: 40
+  lr: 0.0001
+  weight_decay: 0.0001
+
+loss:
+  name: ce
+  class_weights: [0.479825, 0.899671, 0.928693, 1.199561, 0.846749, 1.028195, 0.872408, 1.107287, 1.439474, 2.617225, 1.151579, 1.370927, 0.799708, 1.799342, 0.959649, 0.959649, 0.846749, 1.199561, 0.899671]
+  focal_gamma: 2.0
+
+output:
+  save_dir: outputs/experiments
+
+best_model_metric: macro_f1
