@@ -24,6 +24,9 @@ def build_model(
     prototype_distance: str = "cosine",
     normalize_prototype_embedding: bool = True,
 ):
+    if experiment_mode == "multi_prototype_metric" and not use_chromosome_id:
+        raise ValueError("multi_prototype_metric mode requires use_chromosome_id=True")
+
     if use_pair_input:
         if pair_model_type == "siamese":
             base_model = SiamesePairClassifier(
@@ -57,37 +60,36 @@ def build_model(
 
         else:
             raise ValueError(f"Unsupported pair_model_type: {pair_model_type}")
-
-        if experiment_mode == "multi_prototype_metric":
-            if not use_chromosome_id:
-                raise ValueError("multi_prototype_metric mode requires use_chromosome_id=True")
-
-            if not hasattr(base_model, "embedding_dim"):
-                raise ValueError(
-                    "Base model must expose `embedding_dim` for multi_prototype_metric mode"
-                )
-
-            return MultiPrototypeMetricModel(
-                base_model=base_model,
-                num_chromosome_types=num_chromosome_types,
-                embedding_dim=base_model.embedding_dim,
-                num_prototypes=num_prototypes,
-                distance=prototype_distance,
-                normalize_embedding=normalize_prototype_embedding,
-            )
-
-        return base_model
-
-    if use_chromosome_id:
+    elif use_chromosome_id:
         if num_chromosome_types is None:
             raise ValueError("num_chromosome_types must be provided when use_chromosome_id=True")
 
-        return ChromosomeConditionalClassifier(
+        base_model = ChromosomeConditionalClassifier(
             backbone_name=model_name,
             num_classes=num_classes,
             pretrained=pretrained,
             num_chromosome_types=num_chromosome_types,
             chr_embed_dim=chr_embed_dim,
         )
+    else:
+        if experiment_mode == "multi_prototype_metric":
+            raise ValueError("multi_prototype_metric mode requires a chromosome-conditional base model")
 
-    return timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+        return timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+
+    if experiment_mode == "multi_prototype_metric":
+        if not hasattr(base_model, "embedding_dim"):
+            raise ValueError(
+                "Base model must expose `embedding_dim` for multi_prototype_metric mode"
+            )
+
+        return MultiPrototypeMetricModel(
+            base_model=base_model,
+            num_chromosome_types=num_chromosome_types,
+            embedding_dim=base_model.embedding_dim,
+            num_prototypes=num_prototypes,
+            distance=prototype_distance,
+            normalize_embedding=normalize_prototype_embedding,
+        )
+
+    return base_model

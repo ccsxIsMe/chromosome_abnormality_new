@@ -70,16 +70,21 @@ class ChromosomeConditionalClassifier(nn.Module):
             embedding_dim=chr_embed_dim
         )
 
-        self.classifier = nn.Sequential(
+        self.embedding_head = nn.Sequential(
             nn.Linear(feat_dim + chr_embed_dim, 256),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
-            nn.Linear(256, num_classes),
         )
+        self.classifier = nn.Linear(256, num_classes)
+        self.embedding_dim = 256
 
     def forward(self, images, chr_idx):
         img_feat = self.backbone(images)
         chr_feat = self.chr_embedding(chr_idx)
         feat = torch.cat([img_feat, chr_feat], dim=1)
-        logits = self.classifier(feat)
-        return logits
+        embedding = self.embedding_head(feat)
+        logits = self.classifier(embedding)
+        return {
+            "logits": logits,
+            "embedding": embedding,
+        }

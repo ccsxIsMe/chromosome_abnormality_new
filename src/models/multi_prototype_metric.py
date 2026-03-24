@@ -79,11 +79,19 @@ class MultiPrototypeMetricModel(nn.Module):
         min_dist, min_idx = dists.min(dim=1)
         return dists, min_dist, min_idx
 
-    def forward(self, left_image, right_image, chr_idx=None):
+    def forward(self, *inputs):
+        if len(inputs) == 2:
+            images, chr_idx = inputs
+            base_output = self.base_model(images, chr_idx)
+        elif len(inputs) == 3:
+            left_image, right_image, chr_idx = inputs
+            base_output = self.base_model(left_image, right_image, chr_idx)
+        else:
+            raise ValueError("MultiPrototypeMetricModel expects (images, chr_idx) or (left_image, right_image, chr_idx)")
+
         if chr_idx is None:
             raise ValueError("chr_idx is required for MultiPrototypeMetricModel")
 
-        base_output = self.base_model(left_image, right_image, chr_idx)
         if not isinstance(base_output, dict):
             raise ValueError("base_model must return a dict containing at least 'embedding'")
 
