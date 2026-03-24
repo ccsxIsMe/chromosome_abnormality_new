@@ -1,0 +1,234 @@
+experiment_mode: multi_prototype_metric
+config_path: configs/n3_nonpair_case_isolated_v1_resnet50_multi_prototype_metric.yaml
+experiment_name: n3_nonpair_case_isolated_v1_resnet50_multi_prototype_metric
+save_dir: outputs/experiments/n3_nonpair_case_isolated_v1_resnet50_multi_prototype_metric
+best_model_path: outputs/experiments/n3_nonpair_case_isolated_v1_resnet50_multi_prototype_metric/best_model.pth
+best_model_metric: auprc
+best_model_metric_value: 0.37313015908738584
+best_threshold: 0.26356952753498325
+best_threshold_score: 0.4246575342465754
+best_threshold_stats:
+  precision: 0.7209302325581395
+  recall: 0.30097087378640774
+  f1: 0.4246575342465754
+  balanced_acc: 0.6491909385113268
+split_summary:
+  train_csv: data_protocol/nonpair_case_isolated_v1/train.csv
+  val_csv: data_protocol/nonpair_case_isolated_v1/val.csv
+  test_csv: data_protocol/nonpair_case_isolated_v1/test.csv
+  train_has_case_id: true
+  train_num_cases: 20
+  val_has_case_id: true
+  val_num_cases: 6
+  test_has_case_id: true
+  test_num_cases: 6
+  case_isolation_checkable: true
+  train_val_overlap_cases: []
+  train_test_overlap_cases: []
+  val_test_overlap_cases: []
+  num_train_val_overlap: 0
+  num_train_test_overlap: 0
+  num_val_test_overlap: 0
+  is_case_isolated: true
+model_settings:
+  num_prototypes: 4
+  prototype_distance: cosine
+  normalize_prototype_embedding: true
+loss_settings:
+  name: ce
+  class_weights:
+  - 0.511111
+  - 23.0
+  focal_gamma: 2.0
+  metric:
+    cls_weight: 0.5
+    normal_weight: 1.0
+    abnormal_weight: 1.0
+    abnormal_margin: 0.35
+    diversity_weight: 0.05
+    diversity_margin: 0.2
+style_consistency: {}
+calibration:
+  enabled: true
+  method: zscore
+val_metrics_05:
+  auroc: 0.8510237638901981
+  auprc: 0.37313015908738584
+  f1: 0.29508196721311475
+  precision_abnormal: 0.9473684210526315
+  recall_abnormal: 0.17475728155339806
+  balanced_acc: 0.5872707659115426
+  confusion_matrix:
+    tn: 4634
+    fp: 1
+    fn: 85
+    tp: 18
+  normal:
+    acc: 0.9997842502696872
+    precision: 0.9819877092604365
+    recall: 0.9997842502696872
+    f1: 0.9908060722685483
+    support: 4635
+  abnormal:
+    acc: 0.17475728155339806
+    precision: 0.9473684210526315
+    recall: 0.17475728155339806
+    f1: 0.29508196721311475
+    support: 103
+  loss: 1.423231188696524
+test_metrics_05:
+  auroc: 0.7163379355687047
+  auprc: 0.12979240950082327
+  f1: 0.13333333333333336
+  precision_abnormal: 0.5
+  recall_abnormal: 0.07692307692307693
+  balanced_acc: 0.5376068376068376
+  confusion_matrix:
+    tn: 4672
+    fp: 8
+    fn: 96
+    tp: 8
+  normal:
+    acc: 0.9982905982905983
+    precision: 0.9798657718120806
+    recall: 0.9982905982905983
+    f1: 0.9889923793395428
+    support: 4680
+  abnormal:
+    acc: 0.07692307692307693
+    precision: 0.5
+    recall: 0.07692307692307693
+    f1: 0.13333333333333336
+    support: 104
+  loss: 1.7303849623413379
+test_metrics_best:
+  auroc: 0.7163379355687047
+  auprc: 0.12979240950082327
+  f1: 0.13432835820895522
+  precision_abnormal: 0.3
+  recall_abnormal: 0.08653846153846154
+  balanced_acc: 0.541025641025641
+  confusion_matrix:
+    tn: 4659
+    fp: 21
+    fn: 95
+    tp: 9
+  normal:
+    acc: 0.9955128205128205
+    precision: 0.9800168279343711
+    recall: 0.9955128205128205
+    f1: 0.9877040491838032
+    support: 4680
+  abnormal:
+    acc: 0.08653846153846154
+    precision: 0.3
+    recall: 0.08653846153846154
+    f1: 0.13432835820895522
+    support: 104
+  loss: 1.7303849623413379
+val_casewise_metrics_05:
+  auroc: 0.8764309129565044
+  auprc: 0.24259219679627533
+  f1: 0.32
+  precision_abnormal: 0.272108843537415
+  recall_abnormal: 0.3883495145631068
+  balanced_acc: 0.6826321467098166
+  confusion_matrix:
+    tn: 4528
+    fp: 107
+    fn: 63
+    tp: 40
+  normal:
+    acc: 0.9769147788565264
+    precision: 0.9862774994554563
+    recall: 0.9769147788565264
+    f1: 0.9815738131367874
+    support: 4635
+  abnormal:
+    acc: 0.3883495145631068
+    precision: 0.272108843537415
+    recall: 0.3883495145631068
+    f1: 0.32
+    support: 103
+val_casewise_best:
+  auroc: 0.8764309129565044
+  auprc: 0.24259219679627533
+  f1: 0.3950617283950617
+  precision_abnormal: 0.5423728813559322
+  recall_abnormal: 0.3106796116504854
+  balanced_acc: 0.6524271844660194
+  confusion_matrix:
+    tn: 4608
+    fp: 27
+    fn: 71
+    tp: 32
+  normal:
+    acc: 0.9941747572815534
+    precision: 0.9848258174823681
+    recall: 0.9941747572815534
+    f1: 0.9894782048529096
+    support: 4635
+  abnormal:
+    acc: 0.3106796116504854
+    precision: 0.5423728813559322
+    recall: 0.3106796116504854
+    f1: 0.3950617283950617
+    support: 103
+  loss: 1.423231188696524
+test_casewise_metrics_05:
+  auroc: 0.7307384122287968
+  auprc: 0.08188702718765331
+  f1: 0.12017167381974249
+  precision_abnormal: 0.10852713178294573
+  recall_abnormal: 0.1346153846153846
+  balanced_acc: 0.5550213675213675
+  confusion_matrix:
+    tn: 4565
+    fp: 115
+    fn: 90
+    tp: 14
+  normal:
+    acc: 0.9754273504273504
+    precision: 0.9806659505907627
+    recall: 0.9754273504273504
+    f1: 0.9780396357793251
+    support: 4680
+  abnormal:
+    acc: 0.1346153846153846
+    precision: 0.10852713178294573
+    recall: 0.1346153846153846
+    f1: 0.12017167381974249
+    support: 104
+  loss: 1.7303849623413379
+test_casewise_best:
+  auroc: 0.7307384122287968
+  auprc: 0.08188702718765331
+  f1: 0.15
+  precision_abnormal: 0.21428571428571427
+  recall_abnormal: 0.11538461538461539
+  balanced_acc: 0.552991452991453
+  confusion_matrix:
+    tn: 4636
+    fp: 44
+    fn: 92
+    tp: 12
+  normal:
+    acc: 0.9905982905982906
+    precision: 0.9805414551607445
+    recall: 0.9905982905982906
+    f1: 0.9855442176870748
+    support: 4680
+  abnormal:
+    acc: 0.11538461538461539
+    precision: 0.21428571428571427
+    recall: 0.11538461538461539
+    f1: 0.15
+    support: 104
+  loss: 1.7303849623413379
+casewise_best_threshold: 3.526363224542434
+casewise_best_threshold_score: 0.3950617283950617
+casewise_best_threshold_stats:
+  precision: 0.5423728813559322
+  recall: 0.3106796116504854
+  f1: 0.3950617283950617
+  balanced_acc: 0.6524271844660194
