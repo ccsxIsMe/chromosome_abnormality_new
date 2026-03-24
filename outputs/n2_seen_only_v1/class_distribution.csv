@@ -1,0 +1,7 @@
+﻿"label","class_name","train_images","val_images","test_images","train_cases","val_cases","test_cases"
+"0","1::inversion","60","21","0","2","1","0"
+"1","2::inversion","11","10","10","1","1","1"
+"2","4::inversion","16","8","0","1","1","0"
+"3","7::inversion","30","0","6","1","0","1"
+"4","13::inversion","24","12","0","1","1","0"
+"5","19::inversion","20","0","4","1","0","1"

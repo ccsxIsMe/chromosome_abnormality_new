@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import (
+    accuracy_score,
     roc_auc_score,
     average_precision_score,
     f1_score,
@@ -7,6 +8,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     precision_score,
     confusion_matrix,
+    precision_recall_fscore_support,
 )
 
 
@@ -97,6 +99,57 @@ def compute_score_based_metrics(y_true, y_score, threshold=0.5, higher_score_mor
         threshold=threshold,
         higher_score_more_positive=higher_score_more_positive,
     )
+
+
+def compute_multiclass_metrics(y_true, y_prob, topk=(1, 3)):
+    y_true = np.asarray(y_true, dtype=np.int64)
+    y_prob = np.asarray(y_prob, dtype=np.float64)
+
+    if y_prob.ndim != 2:
+        raise ValueError(f"Expected y_prob with shape [N, C], got {tuple(y_prob.shape)}")
+    if y_true.shape[0] != y_prob.shape[0]:
+        raise ValueError("Batch size mismatch between y_true and y_prob")
+
+    num_classes = y_prob.shape[1]
+    y_pred = y_prob.argmax(axis=1)
+
+    present_labels = sorted(np.unique(y_true).tolist())
+
+    metrics = {
+        "top1_acc": float(accuracy_score(y_true, y_pred)),
+        "macro_f1": float(
+            f1_score(y_true, y_pred, labels=present_labels, average="macro", zero_division=0)
+        ),
+        "balanced_acc": float(balanced_accuracy_score(y_true, y_pred)),
+    }
+
+    sorted_indices = np.argsort(-y_prob, axis=1)
+    for k in topk:
+        k = int(k)
+        if k <= 0:
+            continue
+        actual_k = min(k, num_classes)
+        hit = (sorted_indices[:, :actual_k] == y_true[:, None]).any(axis=1)
+        metrics[f"top{actual_k}_acc"] = float(hit.mean())
+
+    labels = list(range(num_classes))
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y_true,
+        y_pred,
+        labels=labels,
+        zero_division=0,
+    )
+    metrics["per_class"] = {
+        str(label): {
+            "precision": float(precision[idx]),
+            "recall": float(recall[idx]),
+            "f1": float(f1[idx]),
+            "support": int(support[idx]),
+        }
+        for idx, label in enumerate(labels)
+    }
+
+    return metrics
 
 
 def _build_threshold_candidates(y_score, max_points=200):

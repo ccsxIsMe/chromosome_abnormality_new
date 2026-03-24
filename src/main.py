@@ -36,6 +36,7 @@ from src.utils.casewise_calibration import (
 from src.utils.chromosome_vocab import build_chr_vocab_from_csv
 from src.utils.metrics import (
     compute_classification_metrics,
+    compute_multiclass_metrics,
     compute_score_based_metrics,
     search_best_threshold,
 )
@@ -243,6 +244,7 @@ def evaluate_classifier(model, loader, criterion, device, threshold=0.5, use_chr
     model.eval()
     running_loss = 0.0
     y_true, y_prob = [], []
+    num_classes = None
 
     for batch in tqdm(loader, desc="EvalClassifier", leave=False):
         labels = batch["label"].to(device)
@@ -258,14 +260,22 @@ def evaluate_classifier(model, loader, criterion, device, threshold=0.5, use_chr
 
         logits = extract_logits(model_output)
         loss = criterion(model_output, labels)
-        probs = torch.softmax(logits, dim=1)[:, 1]
+        probs = torch.softmax(logits, dim=1)
+        if num_classes is None:
+            num_classes = probs.shape[1]
 
         batch_size = labels.size(0)
         running_loss += loss.item() * batch_size
         y_true.extend(labels.cpu().numpy().tolist())
-        y_prob.extend(probs.cpu().numpy().tolist())
+        if probs.shape[1] == 2:
+            y_prob.extend(probs[:, 1].cpu().numpy().tolist())
+        else:
+            y_prob.extend(probs.cpu().numpy().tolist())
 
-    metrics = compute_classification_metrics(y_true, y_prob, threshold=threshold)
+    if num_classes == 2:
+        metrics = compute_classification_metrics(y_true, y_prob, threshold=threshold)
+    else:
+        metrics = compute_multiclass_metrics(y_true, y_prob)
     metrics["loss"] = running_loss / len(loader.dataset)
 
     return metrics, y_true, y_prob
@@ -488,6 +498,18 @@ def _print_final_metrics(title, metrics, threshold=None):
     print(metrics["abnormal"])
 
 
+def _print_final_multiclass_metrics(title, metrics):
+    print("\n" + "=" * 80)
+    print(title)
+    print("=" * 80)
+    print(f"Top-1 Accuracy: {metrics['top1_acc']}")
+    if "top3_acc" in metrics:
+        print(f"Top-3 Accuracy: {metrics['top3_acc']}")
+    print(f"Macro-F1: {metrics['macro_f1']}")
+    print(f"Balanced Accuracy: {metrics['balanced_acc']}")
+    print(f"Loss: {metrics['loss']}")
+
+
 def run_classifier_experiment(cfg, config_path=None):
     cfg = deepcopy(cfg)
     context = build_training_context(cfg)
@@ -502,6 +524,7 @@ def run_classifier_experiment(cfg, config_path=None):
     criterion = context["criterion"]
     optimizer = context["optimizer"]
     scheduler = context["scheduler"]
+    num_classes = cfg["model"]["num_classes"]
 
     save_dir = os.path.join(cfg["output"]["save_dir"], cfg["experiment_name"])
     os.makedirs(save_dir, exist_ok=True)
@@ -533,15 +556,15 @@ def run_classifier_experiment(cfg, config_path=None):
             use_chromosome_id=use_chromosome_id,
             use_pair_input=use_pair_input,
         )
-
-        best_th, best_score, best_stats = search_best_threshold(
-            y_true, y_prob, metric="f1", higher_score_more_positive=True
-        )
         scheduler.step()
 
         print(f"Train Logs: {train_logs}")
         print(f"Val Metrics: {val_metrics}")
-        print(f"Best Val Threshold: {best_th:.4f}, Best F1: {best_score:.4f}, Stats: {best_stats}")
+        if num_classes == 2:
+            best_th, best_score, best_stats = search_best_threshold(
+                y_true, y_prob, metric="f1", higher_score_more_positive=True
+            )
+            print(f"Best Val Threshold: {best_th:.4f}, Best F1: {best_score:.4f}, Stats: {best_stats}")
 
         current_metric = val_metrics.get(best_metric_name)
         if current_metric is None:
@@ -555,56 +578,89 @@ def run_classifier_experiment(cfg, config_path=None):
     print("Loading best model for final test...")
     _safe_load_state_dict(model, best_path, device)
 
-    val_metrics_05, val_y_true, val_y_prob = evaluate_classifier(
-        model,
-        val_loader,
-        criterion,
-        device,
-        threshold=0.5,
-        use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input,
-    )
-    best_th, best_score, best_stats = search_best_threshold(
-        val_y_true, val_y_prob, metric="f1", higher_score_more_positive=True
-    )
+    if num_classes == 2:
+        val_metrics_05, val_y_true, val_y_prob = evaluate_classifier(
+            model,
+            val_loader,
+            criterion,
+            device,
+            threshold=0.5,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
+        best_th, best_score, best_stats = search_best_threshold(
+            val_y_true, val_y_prob, metric="f1", higher_score_more_positive=True
+        )
 
-    test_metrics_05, _, _ = evaluate_classifier(
-        model,
-        test_loader,
-        criterion,
-        device,
-        threshold=0.5,
-        use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input,
-    )
-    test_metrics_best, _, _ = evaluate_classifier(
-        model,
-        test_loader,
-        criterion,
-        device,
-        threshold=best_th,
-        use_chromosome_id=use_chromosome_id,
-        use_pair_input=use_pair_input,
-    )
+        test_metrics_05, _, _ = evaluate_classifier(
+            model,
+            test_loader,
+            criterion,
+            device,
+            threshold=0.5,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
+        test_metrics_best, _, _ = evaluate_classifier(
+            model,
+            test_loader,
+            criterion,
+            device,
+            threshold=best_th,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
 
-    _print_final_metrics("Final Test Metrics", test_metrics_05, threshold=0.5)
-    _print_final_metrics("Final Test Metrics", test_metrics_best, threshold=best_th)
+        _print_final_metrics("Final Test Metrics", test_metrics_05, threshold=0.5)
+        _print_final_metrics("Final Test Metrics", test_metrics_best, threshold=best_th)
 
-    results = {
-        "experiment_mode": "classifier",
-        "config_path": config_path,
-        "experiment_name": cfg["experiment_name"],
-        "save_dir": save_dir,
-        "best_model_path": best_path,
-        "best_model_metric": best_metric_name,
-        "best_model_metric_value": best_metric,
-        "best_threshold": best_th,
-        "best_threshold_score": best_score,
-        "best_threshold_stats": best_stats,
-        "val_metrics_05": val_metrics_05,
-        "test_metrics_05": test_metrics_05,
-        "test_metrics_best": test_metrics_best,
-    }
+        results = {
+            "experiment_mode": "classifier",
+            "config_path": config_path,
+            "experiment_name": cfg["experiment_name"],
+            "save_dir": save_dir,
+            "best_model_path": best_path,
+            "best_model_metric": best_metric_name,
+            "best_model_metric_value": best_metric,
+            "best_threshold": best_th,
+            "best_threshold_score": best_score,
+            "best_threshold_stats": best_stats,
+            "val_metrics_05": val_metrics_05,
+            "test_metrics_05": test_metrics_05,
+            "test_metrics_best": test_metrics_best,
+        }
+    else:
+        val_metrics, _, _ = evaluate_classifier(
+            model,
+            val_loader,
+            criterion,
+            device,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
+        test_metrics, _, _ = evaluate_classifier(
+            model,
+            test_loader,
+            criterion,
+            device,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
+
+        _print_final_multiclass_metrics("Final Val Metrics", val_metrics)
+        _print_final_multiclass_metrics("Final Test Metrics", test_metrics)
+
+        results = {
+            "experiment_mode": "classifier",
+            "config_path": config_path,
+            "experiment_name": cfg["experiment_name"],
+            "save_dir": save_dir,
+            "best_model_path": best_path,
+            "best_model_metric": best_metric_name,
+            "best_model_metric_value": best_metric,
+            "val_metrics": val_metrics,
+            "test_metrics": test_metrics,
+        }
 
     results_path = os.path.join(save_dir, "results.yaml")
     with open(results_path, "w", encoding="utf-8") as f:
