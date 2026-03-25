@@ -65,7 +65,8 @@ class SiamesePairClassifier(nn.Module):
 
         self.embedding_head = nn.Sequential(
             nn.Linear(pair_feat_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            # nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
         )
