@@ -35,6 +35,12 @@ def extract_all_prototypes(model_output):
     return None
 
 
+def extract_pair_distance(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("pair_distance")
+    return None
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=None, gamma=2.0, reduction="mean"):
         super().__init__()
@@ -130,6 +136,62 @@ class ClassificationContrastiveLoss(nn.Module):
         cls_term = self.cls_loss(logits, targets)
         contrastive_term = self.contrastive_loss(embeddings, targets)
         return self.cls_weight * cls_term + self.contrastive_weight * contrastive_term
+
+
+class PairContrastiveLoss(nn.Module):
+    """
+    Classic pairwise contrastive objective for homologous pair learning.
+
+    Label semantics in this project:
+    - 0: normal pair, should be close
+    - 1: abnormal pair, should be farther than a margin
+    """
+
+    def __init__(
+        self,
+        cls_loss,
+        cls_weight=1.0,
+        pair_weight=0.1,
+        margin=0.5,
+        normal_weight=1.0,
+        abnormal_weight=1.0,
+    ):
+        super().__init__()
+        self.cls_loss = cls_loss
+        self.cls_weight = cls_weight
+        self.pair_weight = pair_weight
+        self.margin = margin
+        self.normal_weight = normal_weight
+        self.abnormal_weight = abnormal_weight
+
+    def forward(self, model_output, targets):
+        logits = extract_logits(model_output)
+        pair_distance = extract_pair_distance(model_output)
+
+        if pair_distance is None:
+            raise ValueError("PairContrastiveLoss requires 'pair_distance' in model output")
+
+        if pair_distance.ndim != 1:
+            pair_distance = pair_distance.view(-1)
+
+        targets = targets.view(-1)
+        if pair_distance.size(0) != targets.size(0):
+            raise ValueError("Batch size mismatch between pair_distance and targets")
+
+        cls_term = self.cls_loss(logits, targets)
+        total = self.cls_weight * cls_term
+
+        normal_mask = targets == 0
+        abnormal_mask = targets == 1
+
+        pair_term = pair_distance.new_tensor(0.0)
+        if normal_mask.any():
+            pair_term = pair_term + self.normal_weight * pair_distance[normal_mask].pow(2).mean()
+        if abnormal_mask.any():
+            pair_term = pair_term + self.abnormal_weight * F.relu(self.margin - pair_distance[abnormal_mask]).pow(2).mean()
+
+        total = total + self.pair_weight * pair_term
+        return total
 
 
 class MultiPrototypeMetricLoss(nn.Module):
@@ -261,16 +323,27 @@ def build_loss(loss_cfg, device, experiment_mode="classifier"):
         return ClassificationLossWrapper(cls_loss)
 
     aux_name = aux_cfg.get("name", "balanced_supcon")
-    if aux_name != "balanced_supcon":
+    if aux_name == "balanced_supcon":
+        contrastive_loss = BalancedSupConLoss(
+            temperature=aux_cfg.get("temperature", 0.07),
+        )
+
+        return ClassificationContrastiveLoss(
+            cls_loss=cls_loss,
+            contrastive_loss=contrastive_loss,
+            cls_weight=aux_cfg.get("cls_weight", 1.0),
+            contrastive_weight=aux_cfg.get("contrastive_weight", 0.1),
+        )
+
+    if aux_name == "pair_contrastive":
+        return PairContrastiveLoss(
+            cls_loss=cls_loss,
+            cls_weight=aux_cfg.get("cls_weight", 1.0),
+            pair_weight=aux_cfg.get("pair_weight", 0.1),
+            margin=aux_cfg.get("margin", 0.5),
+            normal_weight=aux_cfg.get("normal_weight", 1.0),
+            abnormal_weight=aux_cfg.get("abnormal_weight", 1.0),
+        )
+
+    if aux_name not in {"balanced_supcon", "pair_contrastive"}:
         raise ValueError(f"Unsupported auxiliary loss: {aux_name}")
-
-    contrastive_loss = BalancedSupConLoss(
-        temperature=aux_cfg.get("temperature", 0.07),
-    )
-
-    return ClassificationContrastiveLoss(
-        cls_loss=cls_loss,
-        contrastive_loss=contrastive_loss,
-        cls_weight=aux_cfg.get("cls_weight", 1.0),
-        contrastive_weight=aux_cfg.get("contrastive_weight", 0.1),
-    )

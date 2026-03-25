@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from src.models.local_pair_comparator import ResNetFeatureExtractor
 from src.models.pair_mixstyle import PairMixStyle
@@ -108,7 +109,8 @@ class LocalGlobalPairComparator(nn.Module):
         fused_right = self.global_norm(tokens_right + attended_rl).mean(dim=1)
         fused_diff = torch.abs(fused_left - fused_right)
         fused_mul = fused_left * fused_right
-        return self.global_fusion(torch.cat([fused_left, fused_right, fused_diff, fused_mul], dim=1))
+        fused_global = self.global_fusion(torch.cat([fused_left, fused_right, fused_diff, fused_mul], dim=1))
+        return fused_left, fused_right, fused_global
 
     def forward(self, left_image, right_image, chr_idx=None, return_attention=False):
         left_feat = self.feature_proj(self.encoder(left_image))
@@ -124,10 +126,24 @@ class LocalGlobalPairComparator(nn.Module):
 
         attention = self.local_attention(local_feat)
         local_vec = self.local_pool(local_feat * attention).flatten(1)
+        left_local_vec = self.local_pool(left_feat).flatten(1)
+        right_local_vec = self.local_pool(right_feat).flatten(1)
 
         left_tokens = left_feat.flatten(2).transpose(1, 2)
         right_tokens = right_feat.flatten(2).transpose(1, 2)
-        global_vec = self._pool_global_tokens(left_tokens, right_tokens)
+        left_global_vec, right_global_vec, global_vec = self._pool_global_tokens(left_tokens, right_tokens)
+
+        local_distance = 1.0 - F.cosine_similarity(
+            F.normalize(left_local_vec, dim=1),
+            F.normalize(right_local_vec, dim=1),
+            dim=1,
+        )
+        global_distance = 1.0 - F.cosine_similarity(
+            F.normalize(left_global_vec, dim=1),
+            F.normalize(right_global_vec, dim=1),
+            dim=1,
+        )
+        pair_distance = 0.5 * (local_distance + global_distance)
 
         fused = [local_vec, global_vec]
         if self.use_chromosome_id:
@@ -141,6 +157,9 @@ class LocalGlobalPairComparator(nn.Module):
         output = {
             "logits": logits,
             "embedding": embedding,
+            "pair_distance": pair_distance,
+            "local_distance": local_distance,
+            "global_distance": global_distance,
         }
         if return_attention:
             output["attention"] = attention

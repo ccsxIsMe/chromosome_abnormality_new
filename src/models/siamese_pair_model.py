@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import models
 
 
@@ -59,13 +60,14 @@ class SiamesePairClassifier(nn.Module):
 
         pair_feat_dim = feat_dim * 4 + chr_embed_dim
 
-        self.classifier = nn.Sequential(
+        self.embedding_head = nn.Sequential(
             nn.Linear(pair_feat_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes),
         )
+        self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.embedding_dim = hidden_dim
 
     def forward(self, left_image, right_image, chr_idx=None):
         f_left = self.encoder(left_image)
@@ -82,5 +84,17 @@ class SiamesePairClassifier(nn.Module):
             feats.append(chr_feat)
 
         feat = torch.cat(feats, dim=1)
-        logits = self.classifier(feat)
-        return logits
+        embedding = self.embedding_head(feat)
+        logits = self.classifier(embedding)
+        pair_distance = 1.0 - F.cosine_similarity(
+            F.normalize(f_left, dim=1),
+            F.normalize(f_right, dim=1),
+            dim=1,
+        )
+        return {
+            "logits": logits,
+            "embedding": embedding,
+            "pair_distance": pair_distance,
+            "left_feature": f_left,
+            "right_feature": f_right,
+        }
