@@ -1,3 +1,5 @@
+import random
+
 import pandas as pd
 from PIL import Image
 from torch.utils.data import Dataset
@@ -12,6 +14,7 @@ class ChromosomePairDataset(Dataset):
         use_chromosome_id=False,
         return_style_view=False,
         style_transform=None,
+        random_swap=False,
     ):
         self.df = pd.read_csv(csv_path)
         self.transform = transform
@@ -19,6 +22,7 @@ class ChromosomePairDataset(Dataset):
         self.use_chromosome_id = use_chromosome_id
         self.return_style_view = return_style_view
         self.style_transform = style_transform
+        self.random_swap = random_swap
 
         required_cols = ["left_path", "right_path", "label", "chromosome_id"]
         for col in required_cols:
@@ -31,9 +35,26 @@ class ChromosomePairDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        left_img_raw = Image.open(row["left_path"]).convert("RGB")
-        right_img_raw = Image.open(row["right_path"]).convert("RGB")
+        left_path = row["left_path"]
+        right_path = row["right_path"]
+        left_single_label = int(row["left_single_label"]) if "left_single_label" in self.df.columns else 0
+        right_single_label = int(row["right_single_label"]) if "right_single_label" in self.df.columns else 0
+        left_filename = row["left_filename"] if "left_filename" in self.df.columns else left_path
+        right_filename = row["right_filename"] if "right_filename" in self.df.columns else right_path
+
+        if self.random_swap and random.random() < 0.5:
+            left_path, right_path = right_path, left_path
+            left_single_label, right_single_label = right_single_label, left_single_label
+            left_filename, right_filename = right_filename, left_filename
+
+        left_img_raw = Image.open(left_path).convert("RGB")
+        right_img_raw = Image.open(right_path).convert("RGB")
         label = int(row["label"])
+        side_label = -1
+        if left_single_label == 1 and right_single_label == 0:
+            side_label = 0
+        elif left_single_label == 0 and right_single_label == 1:
+            side_label = 1
 
         # main view
         left_img = left_img_raw.copy()
@@ -46,9 +67,10 @@ class ChromosomePairDataset(Dataset):
             "left_image": left_img,
             "right_image": right_img,
             "label": label,
-            "left_path": row["left_path"],
-            "right_path": row["right_path"],
+            "left_path": left_path,
+            "right_path": right_path,
             "chromosome_id": str(row["chromosome_id"]),
+            "side_label": side_label,
         }
 
         if self.use_chromosome_id:
@@ -83,6 +105,15 @@ class ChromosomePairDataset(Dataset):
         ]
         for col in optional_cols:
             if col in self.df.columns:
-                sample[col] = row[col]
+                if col == "left_single_label":
+                    sample[col] = left_single_label
+                elif col == "right_single_label":
+                    sample[col] = right_single_label
+                elif col == "left_filename":
+                    sample[col] = left_filename
+                elif col == "right_filename":
+                    sample[col] = right_filename
+                else:
+                    sample[col] = row[col]
 
         return sample

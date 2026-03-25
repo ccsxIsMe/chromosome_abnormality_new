@@ -41,6 +41,12 @@ def extract_pair_distance(model_output):
     return None
 
 
+def extract_side_logits(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("side_logits")
+    return None
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=None, gamma=2.0, reduction="mean"):
         super().__init__()
@@ -65,7 +71,7 @@ class ClassificationLossWrapper(nn.Module):
         super().__init__()
         self.base_loss = base_loss
 
-    def forward(self, model_output, targets):
+    def forward(self, model_output, targets, batch=None):
         logits = extract_logits(model_output)
         return self.base_loss(logits, targets)
 
@@ -129,7 +135,7 @@ class ClassificationContrastiveLoss(nn.Module):
         self.cls_weight = cls_weight
         self.contrastive_weight = contrastive_weight
 
-    def forward(self, model_output, targets):
+    def forward(self, model_output, targets, batch=None):
         logits = extract_logits(model_output)
         embeddings = extract_embeddings(model_output)
 
@@ -164,7 +170,7 @@ class PairContrastiveLoss(nn.Module):
         self.normal_weight = normal_weight
         self.abnormal_weight = abnormal_weight
 
-    def forward(self, model_output, targets):
+    def forward(self, model_output, targets, batch=None):
         logits = extract_logits(model_output)
         pair_distance = extract_pair_distance(model_output)
 
@@ -192,6 +198,43 @@ class PairContrastiveLoss(nn.Module):
 
         total = total + self.pair_weight * pair_term
         return total
+
+
+class PairDetectionSideLoss(nn.Module):
+    def __init__(self, cls_loss, side_weight=0.5, side_class_weights=None):
+        super().__init__()
+        self.cls_loss = cls_loss
+        self.side_weight = side_weight
+        self.side_class_weights = side_class_weights
+
+    def forward(self, model_output, targets, batch=None):
+        logits = extract_logits(model_output)
+        total = self.cls_loss(logits, targets)
+
+        if self.side_weight <= 0 or batch is None or "side_label" not in batch:
+            return total
+
+        side_logits = extract_side_logits(model_output)
+        if side_logits is None:
+            return total
+
+        side_labels = batch["side_label"].to(logits.device)
+        valid_mask = side_labels >= 0
+        if not valid_mask.any():
+            return total
+
+        if self.side_class_weights is not None:
+            weight = torch.tensor(
+                self.side_class_weights,
+                dtype=torch.float32,
+                device=logits.device,
+            )
+            side_loss = nn.CrossEntropyLoss(weight=weight)
+        else:
+            side_loss = nn.CrossEntropyLoss()
+
+        side_term = side_loss(side_logits[valid_mask], side_labels[valid_mask])
+        return total + self.side_weight * side_term
 
 
 class MultiPrototypeMetricLoss(nn.Module):
@@ -247,7 +290,7 @@ class MultiPrototypeMetricLoss(nn.Module):
         penalty = F.relu(off_diag - self.diversity_margin).mean()
         return penalty
 
-    def forward(self, model_output, targets):
+    def forward(self, model_output, targets, batch=None):
         prototype_dists = extract_prototype_distances(model_output)
         if prototype_dists is None:
             raise ValueError("MultiPrototypeMetricLoss requires 'prototype_distances' in model output")
@@ -345,5 +388,12 @@ def build_loss(loss_cfg, device, experiment_mode="classifier"):
             abnormal_weight=aux_cfg.get("abnormal_weight", 1.0),
         )
 
-    if aux_name not in {"balanced_supcon", "pair_contrastive"}:
+    if aux_name == "pair_side":
+        return PairDetectionSideLoss(
+            cls_loss=cls_loss,
+            side_weight=aux_cfg.get("side_weight", 0.5),
+            side_class_weights=aux_cfg.get("side_class_weights"),
+        )
+
+    if aux_name not in {"balanced_supcon", "pair_contrastive", "pair_side"}:
         raise ValueError(f"Unsupported auxiliary loss: {aux_name}")

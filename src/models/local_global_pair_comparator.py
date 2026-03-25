@@ -23,11 +23,14 @@ class LocalGlobalPairComparator(nn.Module):
         use_pair_mixstyle=False,
         mixstyle_p=0.5,
         mixstyle_alpha=0.1,
+        use_side_head=False,
+        num_side_classes=2,
     ):
         super().__init__()
 
         self.use_chromosome_id = use_chromosome_id
         self.use_pair_mixstyle = use_pair_mixstyle
+        self.use_side_head = use_side_head
         self.embedding_dim = hidden_dim
 
         self.encoder = ResNetFeatureExtractor(
@@ -100,6 +103,7 @@ class LocalGlobalPairComparator(nn.Module):
             nn.Dropout(dropout),
         )
         self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.side_classifier = nn.Linear(hidden_dim, num_side_classes) if use_side_head else None
 
     def _pool_global_tokens(self, tokens_left, tokens_right):
         attended_lr, _ = self.left_to_right_attn(tokens_left, tokens_right, tokens_right)
@@ -161,6 +165,8 @@ class LocalGlobalPairComparator(nn.Module):
             "local_distance": local_distance,
             "global_distance": global_distance,
         }
+        if self.side_classifier is not None:
+            output["side_logits"] = self.side_classifier(embedding)
         if return_attention:
             output["attention"] = attention
         return output

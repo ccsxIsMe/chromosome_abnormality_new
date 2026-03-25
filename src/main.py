@@ -20,6 +20,7 @@ from src.losses.loss_factory import (
     extract_anomaly_scores,
     extract_embeddings,
     extract_logits,
+    extract_side_logits,
 )
 from src.models.build_model import build_model
 from src.transforms import (
@@ -178,7 +179,7 @@ def train_one_epoch(
             use_pair_input=use_pair_input,
             use_style_view=False,
         )
-        main_loss = criterion(clean_output, labels)
+        main_loss = criterion(clean_output, labels, batch=batch)
         total_loss = main_loss
 
         style_task_loss_value = 0.0
@@ -202,7 +203,7 @@ def train_one_epoch(
             embedding_mode = style_consistency_cfg.get("embedding_mode", "cosine")
             score_mode = style_consistency_cfg.get("score_mode", "mse")
 
-            style_task_loss = criterion(style_output, labels)
+            style_task_loss = criterion(style_output, labels, batch=batch)
             consistency_loss, consistency_logs = compute_style_consistency_loss(
                 clean_output=clean_output,
                 style_output=style_output,
@@ -259,7 +260,7 @@ def evaluate_classifier(model, loader, criterion, device, threshold=0.5, use_chr
         )
 
         logits = extract_logits(model_output)
-        loss = criterion(model_output, labels)
+        loss = criterion(model_output, labels, batch=batch)
         probs = torch.softmax(logits, dim=1)
         if num_classes is None:
             num_classes = probs.shape[1]
@@ -279,6 +280,39 @@ def evaluate_classifier(model, loader, criterion, device, threshold=0.5, use_chr
     metrics["loss"] = running_loss / len(loader.dataset)
 
     return metrics, y_true, y_prob
+
+
+@torch.no_grad()
+def evaluate_side_classifier(model, loader, device, use_chromosome_id=False, use_pair_input=False):
+    model.eval()
+    y_true, y_prob = [], []
+
+    for batch in tqdm(loader, desc="EvalSide", leave=False):
+        model_output = _forward_model(
+            batch=batch,
+            model=model,
+            device=device,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+            use_style_view=False,
+        )
+
+        side_logits = extract_side_logits(model_output)
+        if side_logits is None or "side_label" not in batch:
+            continue
+
+        side_labels = batch["side_label"]
+        if isinstance(side_labels, torch.Tensor):
+            valid_mask = side_labels >= 0
+            if valid_mask.any():
+                side_probs = torch.softmax(side_logits[valid_mask.to(side_logits.device)], dim=1)
+                y_prob.extend(side_probs.cpu().numpy().tolist())
+                y_true.extend(side_labels[valid_mask].cpu().numpy().tolist())
+
+    if len(y_true) == 0:
+        return None
+
+    return compute_multiclass_metrics(y_true, y_prob, topk=(1,))
 
 
 @torch.no_grad()
@@ -358,6 +392,7 @@ def build_datasets(cfg, chr_to_idx):
     if use_pair_input:
         train_kwargs["return_style_view"] = style_enabled
         train_kwargs["style_transform"] = build_style_transform(cfg["data"]["image_size"]) if style_enabled else None
+        train_kwargs["random_swap"] = cfg["data"].get("train_random_swap", False)
 
     train_dataset = dataset_cls(**train_kwargs)
 
@@ -435,6 +470,8 @@ def build_training_context(cfg):
         num_prototypes=cfg["model"].get("num_prototypes", 4),
         prototype_distance=cfg["model"].get("prototype_distance", "cosine"),
         normalize_prototype_embedding=cfg["model"].get("normalize_prototype_embedding", True),
+        use_side_head=cfg["model"].get("use_side_head", False),
+        num_side_classes=cfg["model"].get("num_side_classes", 2),
     ).to(device)
 
     criterion = build_loss(cfg["loss"], device, experiment_mode=experiment_mode)
@@ -629,6 +666,21 @@ def run_classifier_experiment(cfg, config_path=None):
             "test_metrics_05": test_metrics_05,
             "test_metrics_best": test_metrics_best,
         }
+        if cfg["model"].get("use_side_head", False):
+            results["val_side_metrics"] = evaluate_side_classifier(
+                model,
+                val_loader,
+                device,
+                use_chromosome_id=use_chromosome_id,
+                use_pair_input=use_pair_input,
+            )
+            results["test_side_metrics"] = evaluate_side_classifier(
+                model,
+                test_loader,
+                device,
+                use_chromosome_id=use_chromosome_id,
+                use_pair_input=use_pair_input,
+            )
     else:
         val_metrics, _, _ = evaluate_classifier(
             model,

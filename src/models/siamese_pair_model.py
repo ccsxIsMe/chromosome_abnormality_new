@@ -15,10 +15,13 @@ class SiamesePairClassifier(nn.Module):
         use_chromosome_id=False,
         num_chromosome_types=None,
         chr_embed_dim=16,
+        use_side_head=False,
+        num_side_classes=2,
     ):
         super().__init__()
 
         self.use_chromosome_id = use_chromosome_id
+        self.use_side_head = use_side_head
 
         if backbone_name == "resnet18":
             if pretrained:
@@ -67,6 +70,7 @@ class SiamesePairClassifier(nn.Module):
             nn.Dropout(dropout),
         )
         self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.side_classifier = nn.Linear(hidden_dim, num_side_classes) if use_side_head else None
         self.embedding_dim = hidden_dim
 
     def forward(self, left_image, right_image, chr_idx=None):
@@ -91,10 +95,13 @@ class SiamesePairClassifier(nn.Module):
             F.normalize(f_right, dim=1),
             dim=1,
         )
-        return {
+        output = {
             "logits": logits,
             "embedding": embedding,
             "pair_distance": pair_distance,
             "left_feature": f_left,
             "right_feature": f_right,
         }
+        if self.side_classifier is not None:
+            output["side_logits"] = self.side_classifier(embedding)
+        return output

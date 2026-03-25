@@ -23,6 +23,8 @@ def build_model(
     num_prototypes: int = 4,
     prototype_distance: str = "cosine",
     normalize_prototype_embedding: bool = True,
+    use_side_head: bool = False,
+    num_side_classes: int = 2,
 ):
     if experiment_mode == "multi_prototype_metric" and not use_chromosome_id:
         raise ValueError("multi_prototype_metric mode requires use_chromosome_id=True")
@@ -36,6 +38,8 @@ def build_model(
                 use_chromosome_id=use_chromosome_id,
                 num_chromosome_types=num_chromosome_types,
                 chr_embed_dim=chr_embed_dim,
+                use_side_head=use_side_head,
+                num_side_classes=num_side_classes,
             )
 
         elif pair_model_type == "local":
@@ -56,6 +60,8 @@ def build_model(
                 use_pair_mixstyle=use_pair_mixstyle,
                 mixstyle_p=mixstyle_p,
                 mixstyle_alpha=mixstyle_alpha,
+                use_side_head=use_side_head,
+                num_side_classes=num_side_classes,
             )
 
         else:
