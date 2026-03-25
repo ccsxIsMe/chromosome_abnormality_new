@@ -20,7 +20,7 @@ model:
   chr_embed_dim: 16
 
 train:
-  batch_size: 64
+  batch_size: 8
   epochs: 40
   lr: 0.0001
   weight_decay: 0.0001
