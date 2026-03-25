@@ -1,0 +1,89 @@
+experiment_mode: classifier
+config_path: configs/p4_pair_case_isolated_v1_siamese_resnet18_chrid_pair_contrastive.yaml
+experiment_name: p4_pair_case_isolated_v1_siamese_resnet18_chrid_pair_contrastive
+save_dir: outputs/experiments/p4_pair_case_isolated_v1_siamese_resnet18_chrid_pair_contrastive
+best_model_path: outputs/experiments/p4_pair_case_isolated_v1_siamese_resnet18_chrid_pair_contrastive/best_model.pth
+best_model_metric: auprc
+best_model_metric_value: 0.5531558303467708
+best_threshold: 0.040234934542898934
+best_threshold_score: 0.5856353591160222
+best_threshold_stats:
+  precision: 0.6794871794871795
+  recall: 0.5145631067961165
+  f1: 0.5856353591160222
+  balanced_acc: 0.7517407732562142
+val_metrics_05:
+  auroc: 0.843420780830407
+  auprc: 0.5531558303467708
+  f1: 0.4428571428571428
+  precision_abnormal: 0.8378378378378378
+  recall_abnormal: 0.30097087378640774
+  balanced_acc: 0.6491556496591613
+  confusion_matrix:
+    tn: 2250
+    fp: 6
+    fn: 72
+    tp: 31
+  normal:
+    acc: 0.9973404255319149
+    precision: 0.9689922480620154
+    recall: 0.9973404255319149
+    f1: 0.9829619921363041
+    support: 2256
+  abnormal:
+    acc: 0.30097087378640774
+    precision: 0.8378378378378378
+    recall: 0.30097087378640774
+    f1: 0.4428571428571428
+    support: 103
+  loss: 1.8658910831906321
+test_metrics_05:
+  auroc: 0.6175968898278669
+  auprc: 0.18181955826297264
+  f1: 0.19834710743801656
+  precision_abnormal: 0.7058823529411765
+  recall_abnormal: 0.11538461538461539
+  balanced_acc: 0.5565666886018079
+  confusion_matrix:
+    tn: 2216
+    fp: 5
+    fn: 92
+    tp: 12
+  normal:
+    acc: 0.9977487618190004
+    precision: 0.9601386481802426
+    recall: 0.9977487618190004
+    f1: 0.9785824685361008
+    support: 2221
+  abnormal:
+    acc: 0.11538461538461539
+    precision: 0.7058823529411765
+    recall: 0.11538461538461539
+    f1: 0.19834710743801656
+    support: 104
+  loss: 3.1831560834505224
+test_metrics_best:
+  auroc: 0.6175968898278669
+  auprc: 0.18181955826297264
+  f1: 0.16216216216216214
+  precision_abnormal: 0.2727272727272727
+  recall_abnormal: 0.11538461538461539
+  balanced_acc: 0.5504883455131091
+  confusion_matrix:
+    tn: 2189
+    fp: 32
+    fn: 92
+    tp: 12
+  normal:
+    acc: 0.9855920756416029
+    precision: 0.9596668128014029
+    recall: 0.9855920756416029
+    f1: 0.97245668591737
+    support: 2221
+  abnormal:
+    acc: 0.11538461538461539
+    precision: 0.2727272727272727
+    recall: 0.11538461538461539
+    f1: 0.16216216216216214
+    support: 104
+  loss: 3.1831560834505224
