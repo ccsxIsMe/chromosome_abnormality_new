@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import yaml
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
 import sys
@@ -414,11 +414,59 @@ def build_datasets(cfg, chr_to_idx):
 def build_loaders(cfg, train_dataset, val_dataset, test_dataset):
     batch_size = cfg["train"]["batch_size"]
     num_workers = cfg["data"]["num_workers"]
+    sampler_cfg = cfg.get("train", {}).get("sampler", {})
+
+    train_sampler = None
+    train_shuffle = True
+    if sampler_cfg.get("enabled", False):
+        if not hasattr(train_dataset, "df") or "label" not in train_dataset.df.columns:
+            raise ValueError("Balanced train sampler requires dataset.df['label']")
+
+        labels = train_dataset.df["label"].astype(int).to_numpy()
+        unique_labels, counts = np.unique(labels, return_counts=True)
+
+        strategy = sampler_cfg.get("strategy", "inverse_freq")
+        class_weights = {}
+        for label, count in zip(unique_labels.tolist(), counts.tolist()):
+            if strategy == "inverse_freq":
+                class_weights[int(label)] = 1.0 / max(int(count), 1)
+            elif strategy == "sqrt_inverse_freq":
+                class_weights[int(label)] = 1.0 / np.sqrt(max(int(count), 1))
+            else:
+                raise ValueError(f"Unsupported sampler strategy: {strategy}")
+
+        sample_weights = [class_weights[int(label)] for label in labels.tolist()]
+        num_samples = sampler_cfg.get("num_samples", len(sample_weights))
+        if num_samples in (None, "auto"):
+            num_samples = len(sample_weights)
+
+        sampler_seed = sampler_cfg.get("seed", cfg.get("seed", 42))
+        sampler_generator = torch.Generator()
+        sampler_generator.manual_seed(int(sampler_seed))
+
+        train_sampler = WeightedRandomSampler(
+            weights=torch.as_tensor(sample_weights, dtype=torch.double),
+            num_samples=int(num_samples),
+            replacement=sampler_cfg.get("replacement", True),
+            generator=sampler_generator,
+        )
+        train_shuffle = False
+
+        print(
+            "Train sampler enabled:",
+            {
+                "strategy": strategy,
+                "replacement": sampler_cfg.get("replacement", True),
+                "num_samples": int(num_samples),
+                "label_counts": {int(k): int(v) for k, v in zip(unique_labels, counts)},
+            },
+        )
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=train_shuffle,
+        sampler=train_sampler,
         num_workers=num_workers,
     )
     val_loader = DataLoader(

@@ -1,0 +1,47 @@
+experiment_name: p6_pair_case_isolated_v1_siamese_resnet18_chrid_balanced_sampler_pair_contrastive
+
+seed: 42
+device: cuda
+
+data:
+  train_csv: data_protocol/p1_pair_case_isolated_v1/train.csv
+  val_csv: data_protocol/p1_pair_case_isolated_v1/val.csv
+  test_csv: data_protocol/p1_pair_case_isolated_v1/test.csv
+  image_size: 300
+  num_workers: 4
+
+model:
+  name: resnet18
+  num_classes: 2
+  pretrained: true
+  use_chromosome_id: true
+  use_pair_input: true
+  pair_model_type: siamese
+  chr_embed_dim: 16
+
+train:
+  batch_size: 64
+  epochs: 40
+  lr: 0.0001
+  weight_decay: 0.0001
+  sampler:
+    enabled: true
+    strategy: inverse_freq
+    replacement: true
+    num_samples: auto
+
+loss:
+  name: ce
+  auxiliary:
+    enabled: true
+    name: pair_contrastive
+    cls_weight: 1.0
+    pair_weight: 0.2
+    margin: 0.5
+    normal_weight: 1.0
+    abnormal_weight: 1.0
+
+output:
+  save_dir: outputs/experiments
+
+best_model_metric: auprc
