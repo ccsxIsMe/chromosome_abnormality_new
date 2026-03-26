@@ -522,7 +522,7 @@ def build_training_context(cfg):
         num_side_classes=cfg["model"].get("num_side_classes", 2),
     ).to(device)
 
-    criterion = build_loss(cfg["loss"], device, experiment_mode=experiment_mode, model=model)
+    criterion = build_loss(cfg["loss"], device, experiment_mode=experiment_mode, model=model).to(device)
     optimizer = AdamW(
         model.parameters(),
         lr=cfg["train"]["lr"],

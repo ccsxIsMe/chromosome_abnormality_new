@@ -319,13 +319,13 @@ class BPaCoLoss(nn.Module):
             ptr = (ptr + 1) % self.queue_size
         self.queue_ptr[0] = ptr
 
-    def _class_averaged_queue_logits(self, features):
-        valid_mask = self.queue_labels >= 0
+    def _class_averaged_queue_logits(self, features, queue_features, queue_labels):
+        valid_mask = queue_labels >= 0
         if not valid_mask.any():
             return features.new_zeros(features.size(0), self.num_classes)
 
-        queue_feat = self.queue[valid_mask]
-        queue_labels = self.queue_labels[valid_mask]
+        queue_feat = queue_features[valid_mask]
+        queue_labels = queue_labels[valid_mask]
         sim = torch.matmul(features, queue_feat.t()) / self.temperature
 
         aggregated = features.new_zeros(features.size(0), self.num_classes)
@@ -347,19 +347,28 @@ class BPaCoLoss(nn.Module):
         features = F.normalize(embeddings, dim=1)
         targets = targets.view(-1)
 
+        # Use buffer snapshots for the current forward pass, then update the
+        # real buffers after loss computation. This avoids in-place version
+        # conflicts during backward.
+        center_initialized = self.center_initialized.detach().clone()
+        class_centers = self.class_centers.detach().clone()
+        queue_features = self.queue.detach().clone()
+        queue_labels = self.queue_labels.detach().clone()
+        class_prior = self.class_prior.detach().clone()
+
         center_logits = features.new_zeros(features.size(0), self.num_classes)
-        valid_center_mask = self.center_initialized
+        valid_center_mask = center_initialized
         if valid_center_mask.any():
-            valid_centers = F.normalize(self.class_centers[valid_center_mask], dim=1)
+            valid_centers = F.normalize(class_centers[valid_center_mask], dim=1)
             center_logits[:, valid_center_mask] = torch.matmul(features, valid_centers.t()) / self.temperature
 
-        queue_logits = self._class_averaged_queue_logits(features)
+        queue_logits = self._class_averaged_queue_logits(features, queue_features, queue_labels)
         complement_logits = torch.logsumexp(
             torch.stack([center_logits, queue_logits], dim=0),
             dim=0,
         )
 
-        prior_adjust = self.logit_tau * torch.log(self.class_prior.clamp_min(self.eps))
+        prior_adjust = self.logit_tau * torch.log(class_prior.clamp_min(self.eps))
         cls_term = self.cls_loss(logits - prior_adjust.unsqueeze(0), targets)
         contrastive_term = F.cross_entropy(complement_logits - prior_adjust.unsqueeze(0), targets)
 
