@@ -520,6 +520,10 @@ class MultiPrototypeMetricLoss(nn.Module):
         abnormal_margin=0.35,
         diversity_weight=0.05,
         diversity_margin=0.2,
+        structure_weight=0.0,
+        pericentric_weight=1.0,
+        arm_weight=1.0,
+        major_weight=1.0,
         eps=1e-8,
     ):
         super().__init__()
@@ -530,6 +534,10 @@ class MultiPrototypeMetricLoss(nn.Module):
         self.abnormal_margin = abnormal_margin
         self.diversity_weight = diversity_weight
         self.diversity_margin = diversity_margin
+        self.structure_weight = structure_weight
+        self.pericentric_weight = pericentric_weight
+        self.arm_weight = arm_weight
+        self.major_weight = major_weight
         self.eps = eps
 
     def _prototype_diversity_penalty(self, all_prototypes):
@@ -552,6 +560,12 @@ class MultiPrototypeMetricLoss(nn.Module):
 
         penalty = F.relu(off_diag - self.diversity_margin).mean()
         return penalty
+
+    def _masked_ce(self, logits, labels):
+        valid_mask = labels >= 0
+        if logits is None or not valid_mask.any():
+            return None
+        return F.cross_entropy(logits[valid_mask], labels[valid_mask])
 
     def forward(self, model_output, targets, batch=None):
         prototype_dists = extract_prototype_distances(model_output)
@@ -581,6 +595,65 @@ class MultiPrototypeMetricLoss(nn.Module):
         if abnormal_mask.any():
             abnormal_term = F.relu(self.abnormal_margin - min_dist[abnormal_mask]).mean()
             total_loss = total_loss + self.abnormal_weight * abnormal_term
+
+        if self.structure_weight > 0 and batch is not None:
+            structure_logits = extract_structure_logits(model_output)
+            if structure_logits is not None:
+                structure_total = min_dist.new_tensor(0.0)
+                structure_terms = 0.0
+
+                pericentric_labels = batch.get("pericentric_label")
+                if pericentric_labels is not None:
+                    loss = self._masked_ce(
+                        structure_logits.get("pericentric_logits"),
+                        pericentric_labels.to(min_dist.device),
+                    )
+                    if loss is not None:
+                        structure_total = structure_total + self.pericentric_weight * loss
+                        structure_terms += self.pericentric_weight
+
+                bp1_arm_labels = batch.get("bp1_arm_label")
+                if bp1_arm_labels is not None:
+                    loss = self._masked_ce(
+                        structure_logits.get("bp1_arm_logits"),
+                        bp1_arm_labels.to(min_dist.device),
+                    )
+                    if loss is not None:
+                        structure_total = structure_total + self.arm_weight * loss
+                        structure_terms += self.arm_weight
+
+                bp2_arm_labels = batch.get("bp2_arm_label")
+                if bp2_arm_labels is not None:
+                    loss = self._masked_ce(
+                        structure_logits.get("bp2_arm_logits"),
+                        bp2_arm_labels.to(min_dist.device),
+                    )
+                    if loss is not None:
+                        structure_total = structure_total + self.arm_weight * loss
+                        structure_terms += self.arm_weight
+
+                bp1_major_labels = batch.get("bp1_major_label")
+                if bp1_major_labels is not None:
+                    loss = self._masked_ce(
+                        structure_logits.get("bp1_major_logits"),
+                        bp1_major_labels.to(min_dist.device),
+                    )
+                    if loss is not None:
+                        structure_total = structure_total + self.major_weight * loss
+                        structure_terms += self.major_weight
+
+                bp2_major_labels = batch.get("bp2_major_label")
+                if bp2_major_labels is not None:
+                    loss = self._masked_ce(
+                        structure_logits.get("bp2_major_logits"),
+                        bp2_major_labels.to(min_dist.device),
+                    )
+                    if loss is not None:
+                        structure_total = structure_total + self.major_weight * loss
+                        structure_terms += self.major_weight
+
+                if structure_terms > 0:
+                    total_loss = total_loss + self.structure_weight * (structure_total / structure_terms)
 
         all_prototypes = extract_all_prototypes(model_output)
         if self.diversity_weight > 0:
@@ -622,6 +695,10 @@ def build_loss(loss_cfg, device, experiment_mode="classifier", model=None):
             abnormal_margin=metric_cfg.get("abnormal_margin", 0.35),
             diversity_weight=metric_cfg.get("diversity_weight", 0.05),
             diversity_margin=metric_cfg.get("diversity_margin", 0.2),
+            structure_weight=metric_cfg.get("structure_weight", 0.0),
+            pericentric_weight=metric_cfg.get("pericentric_weight", 1.0),
+            arm_weight=metric_cfg.get("arm_weight", 1.0),
+            major_weight=metric_cfg.get("major_weight", 1.0),
         )
 
     aux_cfg = loss_cfg.get("auxiliary")
