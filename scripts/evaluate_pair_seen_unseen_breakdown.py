@@ -1,6 +1,7 @@
 import argparse
 import os
 
+import numpy as np
 import pandas as pd
 import torch
 import yaml
@@ -13,6 +14,18 @@ from src.models.build_model import build_model
 from src.transforms import build_val_transform
 from src.utils.chromosome_vocab import build_chr_vocab_from_csv
 from src.utils.metrics import compute_classification_metrics
+
+
+def to_serializable(value):
+    if isinstance(value, dict):
+        return {k: to_serializable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_serializable(v) for v in value]
+    if isinstance(value, tuple):
+        return [to_serializable(v) for v in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 @torch.no_grad()
@@ -152,7 +165,10 @@ def main():
     if ckpt_path is None:
         ckpt_path = os.path.join(cfg["output"]["save_dir"], cfg["experiment_name"], "best_model.pth")
 
-    state = torch.load(ckpt_path, map_location=device)
+    try:
+        state = torch.load(ckpt_path, map_location=device, weights_only=True)
+    except TypeError:
+        state = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(state)
 
     _, val_loader = build_loader(cfg["data"]["val_csv"], cfg, chr_to_idx)
@@ -195,7 +211,7 @@ def main():
     val_df.to_csv(os.path.join(save_dir, "val_predictions.csv"), index=False)
     test_df.to_csv(os.path.join(save_dir, "test_predictions.csv"), index=False)
     with open(os.path.join(save_dir, "seen_unseen_breakdown.yaml"), "w", encoding="utf-8") as f:
-        yaml.safe_dump(summary, f, allow_unicode=True, sort_keys=False)
+        yaml.safe_dump(to_serializable(summary), f, allow_unicode=True, sort_keys=False)
 
     print(f"Saved breakdown to {os.path.join(save_dir, 'seen_unseen_breakdown.yaml')}")
     print(f"Saved val predictions to {os.path.join(save_dir, 'val_predictions.csv')}")
