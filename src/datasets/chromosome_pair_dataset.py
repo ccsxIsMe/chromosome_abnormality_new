@@ -131,6 +131,15 @@ class ChromosomePairDataset(Dataset):
             "right_filename",
             "split",
         ]
+        text_optional_cols = {
+            "case_id",
+            "pair_key",
+            "abnormal_subtype_id",
+            "subtype_status",
+            "left_filename",
+            "right_filename",
+            "split",
+        }
         for col in optional_cols:
             if col in self.df.columns:
                 if col == "left_single_label":
@@ -142,6 +151,10 @@ class ChromosomePairDataset(Dataset):
                 elif col == "right_filename":
                     sample[col] = right_filename
                 else:
-                    sample[col] = row[col]
+                    value = row[col]
+                    if col in text_optional_cols:
+                        sample[col] = "" if pd.isna(value) else str(value)
+                    else:
+                        sample[col] = value
 
         return sample

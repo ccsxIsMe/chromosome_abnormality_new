@@ -35,8 +35,8 @@ def _normalize_karyotype(text):
     return (
         str(text)
         .strip()
-        .replace("（", "(")
-        .replace("）", ")")
+        .replace("\uFF08", "(")
+        .replace("\uFF09", ")")
         .replace(" ", "")
     )
 
@@ -49,7 +49,6 @@ def _parse_breakpoint(text):
     arm = match.group(1)
     major = int(match.group(2))
     minor = match.group(3)
-    major_token = f"{arm}{major}"
 
     return {
         "raw": text,
@@ -57,7 +56,7 @@ def _parse_breakpoint(text):
         "arm_label": 0 if arm == "p" else 1,
         "major": major,
         "minor": int(minor) if minor is not None else -1,
-        "major_token": major_token,
+        "major_token": f"{arm}{major}",
     }
 
 
@@ -70,7 +69,6 @@ def parse_inversion_karyotype(karyotype):
     chr_id = canonicalize_chromosome_id(match.group(1))
     bp1 = _parse_breakpoint(match.group(2))
     bp2 = _parse_breakpoint(match.group(3))
-
     pericentric = int(bp1["arm"] != bp2["arm"])
 
     return {
@@ -82,10 +80,10 @@ def parse_inversion_karyotype(karyotype):
         "bp2_arm": bp2["arm"],
         "bp1_arm_label": bp1["arm_label"],
         "bp2_arm_label": bp2["arm_label"],
-        "bp1_major_token": bp1["major_token"],
-        "bp2_major_token": bp2["major_token"],
         "bp1_major": bp1["major"],
         "bp2_major": bp2["major"],
+        "bp1_major_token": bp1["major_token"],
+        "bp2_major_token": bp2["major_token"],
         "pericentric_label": pericentric,
         "paracentric_label": 1 - pericentric,
     }
