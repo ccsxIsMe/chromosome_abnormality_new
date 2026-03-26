@@ -47,6 +47,12 @@ def extract_side_logits(model_output):
     return None
 
 
+def extract_structure_logits(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("structure_logits")
+    return None
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=None, gamma=2.0, reduction="mean"):
         super().__init__()
@@ -235,6 +241,121 @@ class PairDetectionSideLoss(nn.Module):
 
         side_term = side_loss(side_logits[valid_mask], side_labels[valid_mask])
         return total + self.side_weight * side_term
+
+
+class PairStructuredAttributeLoss(nn.Module):
+    def __init__(
+        self,
+        cls_loss,
+        cls_weight=1.0,
+        pair_weight=0.2,
+        margin=0.5,
+        normal_weight=1.0,
+        abnormal_weight=1.0,
+        structure_weight=0.5,
+        pericentric_weight=1.0,
+        arm_weight=1.0,
+        major_weight=1.0,
+    ):
+        super().__init__()
+        self.cls_loss = cls_loss
+        self.cls_weight = cls_weight
+        self.pair_weight = pair_weight
+        self.margin = margin
+        self.normal_weight = normal_weight
+        self.abnormal_weight = abnormal_weight
+        self.structure_weight = structure_weight
+        self.pericentric_weight = pericentric_weight
+        self.arm_weight = arm_weight
+        self.major_weight = major_weight
+
+    def _masked_ce(self, logits, labels):
+        valid_mask = labels >= 0
+        if logits is None or not valid_mask.any():
+            return None
+        return F.cross_entropy(logits[valid_mask], labels[valid_mask])
+
+    def forward(self, model_output, targets, batch=None):
+        logits = extract_logits(model_output)
+        pair_distance = extract_pair_distance(model_output)
+        structure_logits = extract_structure_logits(model_output)
+
+        if pair_distance is None:
+            raise ValueError("PairStructuredAttributeLoss requires 'pair_distance' in model output")
+
+        targets = targets.view(-1)
+        total = self.cls_weight * self.cls_loss(logits, targets)
+
+        normal_mask = targets == 0
+        abnormal_mask = targets == 1
+
+        pair_term = pair_distance.new_tensor(0.0)
+        if normal_mask.any():
+            pair_term = pair_term + self.normal_weight * pair_distance[normal_mask].pow(2).mean()
+        if abnormal_mask.any():
+            pair_term = pair_term + self.abnormal_weight * F.relu(self.margin - pair_distance[abnormal_mask]).pow(2).mean()
+        total = total + self.pair_weight * pair_term
+
+        if self.structure_weight <= 0 or structure_logits is None or batch is None:
+            return total
+
+        structure_total = pair_distance.new_tensor(0.0)
+        structure_terms = 0
+
+        pericentric_labels = batch.get("pericentric_label")
+        if pericentric_labels is not None:
+            loss = self._masked_ce(
+                structure_logits.get("pericentric_logits"),
+                pericentric_labels.to(logits.device),
+            )
+            if loss is not None:
+                structure_total = structure_total + self.pericentric_weight * loss
+                structure_terms += self.pericentric_weight
+
+        bp1_arm_labels = batch.get("bp1_arm_label")
+        if bp1_arm_labels is not None:
+            loss = self._masked_ce(
+                structure_logits.get("bp1_arm_logits"),
+                bp1_arm_labels.to(logits.device),
+            )
+            if loss is not None:
+                structure_total = structure_total + self.arm_weight * loss
+                structure_terms += self.arm_weight
+
+        bp2_arm_labels = batch.get("bp2_arm_label")
+        if bp2_arm_labels is not None:
+            loss = self._masked_ce(
+                structure_logits.get("bp2_arm_logits"),
+                bp2_arm_labels.to(logits.device),
+            )
+            if loss is not None:
+                structure_total = structure_total + self.arm_weight * loss
+                structure_terms += self.arm_weight
+
+        bp1_major_labels = batch.get("bp1_major_label")
+        if bp1_major_labels is not None:
+            loss = self._masked_ce(
+                structure_logits.get("bp1_major_logits"),
+                bp1_major_labels.to(logits.device),
+            )
+            if loss is not None:
+                structure_total = structure_total + self.major_weight * loss
+                structure_terms += self.major_weight
+
+        bp2_major_labels = batch.get("bp2_major_label")
+        if bp2_major_labels is not None:
+            loss = self._masked_ce(
+                structure_logits.get("bp2_major_logits"),
+                bp2_major_labels.to(logits.device),
+            )
+            if loss is not None:
+                structure_total = structure_total + self.major_weight * loss
+                structure_terms += self.major_weight
+
+        if structure_terms > 0:
+            total = total + self.structure_weight * (structure_total / structure_terms)
+
+        return total
 
 
 class BPaCoLoss(nn.Module):
@@ -556,5 +677,19 @@ def build_loss(loss_cfg, device, experiment_mode="classifier", model=None):
             logit_tau=aux_cfg.get("logit_tau", 1.0),
         )
 
-    if aux_name not in {"balanced_supcon", "pair_contrastive", "pair_side", "bpaco"}:
+    if aux_name == "pair_structured":
+        return PairStructuredAttributeLoss(
+            cls_loss=cls_loss,
+            cls_weight=aux_cfg.get("cls_weight", 1.0),
+            pair_weight=aux_cfg.get("pair_weight", 0.2),
+            margin=aux_cfg.get("margin", 0.5),
+            normal_weight=aux_cfg.get("normal_weight", 1.0),
+            abnormal_weight=aux_cfg.get("abnormal_weight", 1.0),
+            structure_weight=aux_cfg.get("structure_weight", 0.5),
+            pericentric_weight=aux_cfg.get("pericentric_weight", 1.0),
+            arm_weight=aux_cfg.get("arm_weight", 1.0),
+            major_weight=aux_cfg.get("major_weight", 1.0),
+        )
+
+    if aux_name not in {"balanced_supcon", "pair_contrastive", "pair_side", "bpaco", "pair_structured"}:
         raise ValueError(f"Unsupported auxiliary loss: {aux_name}")

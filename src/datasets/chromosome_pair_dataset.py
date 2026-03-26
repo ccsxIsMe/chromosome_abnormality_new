@@ -4,6 +4,8 @@ import pandas as pd
 from PIL import Image
 from torch.utils.data import Dataset
 
+from src.utils.inversion_attributes import get_inversion_attributes_by_chromosome
+
 
 class ChromosomePairDataset(Dataset):
     def __init__(
@@ -93,6 +95,30 @@ class ChromosomePairDataset(Dataset):
 
             sample["left_image_style"] = left_img_style
             sample["right_image_style"] = right_img_style
+
+        attr = get_inversion_attributes_by_chromosome(row["chromosome_id"])
+        if label == 1 and attr is not None:
+            sample["karyotype_text"] = attr["karyotype"]
+            sample["pericentric_label"] = attr["pericentric_label"]
+            sample["bp1_arm_label"] = attr["bp1_arm_label"]
+            sample["bp2_arm_label"] = attr["bp2_arm_label"]
+            sample["bp1_major_label"] = attr["bp1_major_label"]
+            sample["bp2_major_label"] = attr["bp2_major_label"]
+            sample["bp1_text"] = attr["bp1"]
+            sample["bp2_text"] = attr["bp2"]
+            sample["bp1_major_token"] = attr["bp1_major_token"]
+            sample["bp2_major_token"] = attr["bp2_major_token"]
+        else:
+            sample["karyotype_text"] = ""
+            sample["pericentric_label"] = -1
+            sample["bp1_arm_label"] = -1
+            sample["bp2_arm_label"] = -1
+            sample["bp1_major_label"] = -1
+            sample["bp2_major_label"] = -1
+            sample["bp1_text"] = ""
+            sample["bp2_text"] = ""
+            sample["bp1_major_token"] = ""
+            sample["bp2_major_token"] = ""
 
         optional_cols = [
             "case_id",
