@@ -237,6 +237,139 @@ class PairDetectionSideLoss(nn.Module):
         return total + self.side_weight * side_term
 
 
+class BPaCoLoss(nn.Module):
+    """
+    Practical BPaCo-style adaptation for long-tailed subtype classification.
+
+    Design choices for this codebase:
+    - keep the standard CE head as the main supervised objective
+    - add logit compensation based on class prior
+    - maintain class centers plus a memory queue of embeddings
+    - average queued negatives by class to avoid head-class domination
+
+    This is an adaptation to the current single-forward training framework,
+    not an exact reproduction of the original repository training script.
+    """
+
+    def __init__(
+        self,
+        cls_loss,
+        num_classes,
+        embedding_dim,
+        class_counts=None,
+        cls_weight=1.0,
+        contrastive_weight=0.1,
+        temperature=0.07,
+        queue_size=1024,
+        center_momentum=0.9,
+        logit_tau=1.0,
+        eps=1e-8,
+    ):
+        super().__init__()
+        self.cls_loss = cls_loss
+        self.num_classes = int(num_classes)
+        self.embedding_dim = int(embedding_dim)
+        self.cls_weight = cls_weight
+        self.contrastive_weight = contrastive_weight
+        self.temperature = temperature
+        self.queue_size = int(queue_size)
+        self.center_momentum = center_momentum
+        self.logit_tau = logit_tau
+        self.eps = eps
+
+        self.register_buffer("class_centers", torch.zeros(self.num_classes, self.embedding_dim))
+        self.register_buffer("center_initialized", torch.zeros(self.num_classes, dtype=torch.bool))
+        self.register_buffer("queue", torch.zeros(self.queue_size, self.embedding_dim))
+        self.register_buffer("queue_labels", torch.full((self.queue_size,), -1, dtype=torch.long))
+        self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
+
+        if class_counts is None:
+            class_counts = [1.0] * self.num_classes
+        if len(class_counts) != self.num_classes:
+            raise ValueError("class_counts length must match num_classes")
+
+        class_count_tensor = torch.tensor(class_counts, dtype=torch.float32)
+        class_prior = class_count_tensor / class_count_tensor.sum().clamp_min(1.0)
+        self.register_buffer("class_counts", class_count_tensor)
+        self.register_buffer("class_prior", class_prior)
+
+    @torch.no_grad()
+    def _update_centers(self, features, targets):
+        for cls in targets.unique(sorted=True).tolist():
+            cls = int(cls)
+            cls_mask = targets == cls
+            cls_feat = features[cls_mask].mean(dim=0)
+            if not self.center_initialized[cls]:
+                updated = cls_feat
+                self.center_initialized[cls] = True
+            else:
+                updated = self.center_momentum * self.class_centers[cls] + (1.0 - self.center_momentum) * cls_feat
+            self.class_centers[cls] = F.normalize(updated, dim=0)
+
+    @torch.no_grad()
+    def _enqueue(self, features, targets):
+        batch_size = features.size(0)
+        if batch_size == 0:
+            return
+
+        ptr = int(self.queue_ptr.item())
+        for idx in range(batch_size):
+            self.queue[ptr] = features[idx]
+            self.queue_labels[ptr] = targets[idx]
+            ptr = (ptr + 1) % self.queue_size
+        self.queue_ptr[0] = ptr
+
+    def _class_averaged_queue_logits(self, features):
+        valid_mask = self.queue_labels >= 0
+        if not valid_mask.any():
+            return features.new_zeros(features.size(0), self.num_classes)
+
+        queue_feat = self.queue[valid_mask]
+        queue_labels = self.queue_labels[valid_mask]
+        sim = torch.matmul(features, queue_feat.t()) / self.temperature
+
+        aggregated = features.new_zeros(features.size(0), self.num_classes)
+        for cls in range(self.num_classes):
+            cls_mask = queue_labels == cls
+            if cls_mask.any():
+                cls_logits = sim[:, cls_mask]
+                aggregated[:, cls] = torch.logsumexp(cls_logits, dim=1) - torch.log(
+                    cls_logits.new_tensor(float(cls_mask.sum().item()))
+                )
+        return aggregated
+
+    def forward(self, model_output, targets, batch=None):
+        logits = extract_logits(model_output)
+        embeddings = extract_embeddings(model_output)
+        if embeddings is None:
+            raise ValueError("BPaCoLoss requires model output to contain 'embedding'")
+
+        features = F.normalize(embeddings, dim=1)
+        targets = targets.view(-1)
+
+        center_logits = features.new_zeros(features.size(0), self.num_classes)
+        valid_center_mask = self.center_initialized
+        if valid_center_mask.any():
+            valid_centers = F.normalize(self.class_centers[valid_center_mask], dim=1)
+            center_logits[:, valid_center_mask] = torch.matmul(features, valid_centers.t()) / self.temperature
+
+        queue_logits = self._class_averaged_queue_logits(features)
+        complement_logits = torch.logsumexp(
+            torch.stack([center_logits, queue_logits], dim=0),
+            dim=0,
+        )
+
+        prior_adjust = self.logit_tau * torch.log(self.class_prior.clamp_min(self.eps))
+        cls_term = self.cls_loss(logits - prior_adjust.unsqueeze(0), targets)
+        contrastive_term = F.cross_entropy(complement_logits - prior_adjust.unsqueeze(0), targets)
+
+        with torch.no_grad():
+            self._update_centers(features.detach(), targets.detach())
+            self._enqueue(features.detach(), targets.detach())
+
+        return self.cls_weight * cls_term + self.contrastive_weight * contrastive_term
+
+
 class MultiPrototypeMetricLoss(nn.Module):
     """
     Loss for multi-prototype metric learning.
@@ -346,7 +479,7 @@ def build_base_classification_loss(loss_cfg, device):
     raise ValueError(f"Unsupported loss: {name}")
 
 
-def build_loss(loss_cfg, device, experiment_mode="classifier"):
+def build_loss(loss_cfg, device, experiment_mode="classifier", model=None):
     cls_loss = build_base_classification_loss(loss_cfg, device)
 
     if experiment_mode == "multi_prototype_metric":
@@ -395,5 +528,24 @@ def build_loss(loss_cfg, device, experiment_mode="classifier"):
             side_class_weights=aux_cfg.get("side_class_weights"),
         )
 
-    if aux_name not in {"balanced_supcon", "pair_contrastive", "pair_side"}:
+    if aux_name == "bpaco":
+        if model is None:
+            raise ValueError("BPaCo loss requires the instantiated model")
+        if not hasattr(model, "embedding_dim"):
+            raise ValueError("BPaCo loss requires model.embedding_dim")
+
+        return BPaCoLoss(
+            cls_loss=cls_loss,
+            num_classes=aux_cfg["num_classes"],
+            embedding_dim=model.embedding_dim,
+            class_counts=aux_cfg.get("class_counts"),
+            cls_weight=aux_cfg.get("cls_weight", 1.0),
+            contrastive_weight=aux_cfg.get("contrastive_weight", 0.1),
+            temperature=aux_cfg.get("temperature", 0.07),
+            queue_size=aux_cfg.get("queue_size", 1024),
+            center_momentum=aux_cfg.get("center_momentum", 0.9),
+            logit_tau=aux_cfg.get("logit_tau", 1.0),
+        )
+
+    if aux_name not in {"balanced_supcon", "pair_contrastive", "pair_side", "bpaco"}:
         raise ValueError(f"Unsupported auxiliary loss: {aux_name}")

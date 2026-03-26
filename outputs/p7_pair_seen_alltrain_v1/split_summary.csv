@@ -1,0 +1,4 @@
+﻿"split","total_pairs","total_cases","classes_present"
+"train","491","18","17"
+"val","51","4","4"
+"test","20","3","3"
