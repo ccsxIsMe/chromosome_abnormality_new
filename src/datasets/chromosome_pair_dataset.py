@@ -97,6 +97,8 @@ class ChromosomePairDataset(Dataset):
         optional_cols = [
             "case_id",
             "pair_key",
+            "abnormal_subtype_id",
+            "subtype_status",
             "left_single_label",
             "right_single_label",
             "left_filename",
