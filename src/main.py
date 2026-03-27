@@ -1,3 +1,4 @@
+import csv
 import os
 from copy import deepcopy
 
@@ -328,6 +329,7 @@ def evaluate_multi_prototype_metric(
     model.eval()
     running_loss = 0.0
     y_true, y_score, case_ids = [], [], []
+    records = []
 
     for batch in tqdm(loader, desc="EvalMultiProto", leave=False):
         labels = batch["label"].to(device)
@@ -349,8 +351,10 @@ def evaluate_multi_prototype_metric(
 
         batch_size = labels.size(0)
         running_loss += loss.item() * batch_size
-        y_true.extend(labels.cpu().numpy().tolist())
-        y_score.extend(scores.detach().cpu().numpy().tolist())
+        batch_labels = labels.cpu().numpy().tolist()
+        batch_scores = scores.detach().cpu().numpy().tolist()
+        y_true.extend(batch_labels)
+        y_score.extend(batch_scores)
 
         if "case_id" in batch:
             batch_case_ids = batch["case_id"]
@@ -358,6 +362,45 @@ def evaluate_multi_prototype_metric(
                 case_ids.extend([str(x) for x in batch_case_ids])
             else:
                 case_ids.extend([str(x) for x in batch_case_ids])
+
+        metadata_keys = [
+            "case_id",
+            "pair_key",
+            "chromosome_id",
+            "abnormal_subtype_id",
+            "subtype_status",
+            "left_filename",
+            "right_filename",
+            "split",
+            "left_path",
+            "right_path",
+        ]
+
+        normalized_batch_meta = {}
+        for key in metadata_keys:
+            if key not in batch:
+                continue
+            value = batch[key]
+            if isinstance(value, torch.Tensor):
+                normalized_batch_meta[key] = value.detach().cpu().tolist()
+            elif isinstance(value, np.ndarray):
+                normalized_batch_meta[key] = value.tolist()
+            elif isinstance(value, (list, tuple)):
+                normalized_batch_meta[key] = list(value)
+            else:
+                normalized_batch_meta[key] = [value] * batch_size
+
+        for idx in range(batch_size):
+            record = {
+                "label": int(batch_labels[idx]),
+                "anomaly_score": float(batch_scores[idx]),
+            }
+            for key, values in normalized_batch_meta.items():
+                value = values[idx] if idx < len(values) else ""
+                if value is None:
+                    value = ""
+                record[key] = value
+            records.append(record)
 
     metrics = compute_score_based_metrics(
         y_true=y_true,
@@ -367,7 +410,36 @@ def evaluate_multi_prototype_metric(
     )
     metrics["loss"] = running_loss / len(loader.dataset)
 
-    return metrics, y_true, y_score, case_ids
+    return metrics, y_true, y_score, case_ids, records
+
+
+def build_eval_loader_for_csv(cfg, csv_path, chr_to_idx):
+    use_chromosome_id = cfg["model"].get("use_chromosome_id", False)
+    use_pair_input = cfg["model"].get("use_pair_input", False)
+
+    if use_pair_input:
+        from src.datasets.chromosome_pair_dataset import ChromosomePairDataset
+
+        dataset = ChromosomePairDataset(
+            csv_path=csv_path,
+            transform=build_val_transform(cfg["data"]["image_size"]),
+            chr_to_idx=chr_to_idx,
+            use_chromosome_id=use_chromosome_id,
+        )
+    else:
+        dataset = ChromosomeDataset(
+            csv_path=csv_path,
+            transform=build_val_transform(cfg["data"]["image_size"]),
+            chr_to_idx=chr_to_idx,
+            use_chromosome_id=use_chromosome_id,
+        )
+
+    return DataLoader(
+        dataset,
+        batch_size=cfg["train"]["batch_size"],
+        shuffle=False,
+        num_workers=cfg["data"]["num_workers"],
+    )
 
 def build_datasets(cfg, chr_to_idx):
     use_chromosome_id = cfg["model"].get("use_chromosome_id", False)
@@ -533,6 +605,7 @@ def build_training_context(cfg):
     return {
         "device": device,
         "experiment_mode": experiment_mode,
+        "chr_to_idx": chr_to_idx,
         "use_chromosome_id": use_chromosome_id,
         "use_pair_input": use_pair_input,
         "train_loader": train_loader,
@@ -555,6 +628,46 @@ def to_serializable(value):
     if isinstance(value, np.generic):
         return value.item()
     return value
+
+
+def estimate_normal_threshold(y_true, y_score, method="quantile", quantile=0.99, mean_std_k=3.0):
+    normal_scores = [float(score) for label, score in zip(y_true, y_score) if int(label) == 0]
+    if len(normal_scores) == 0:
+        return None
+
+    normal_scores = np.asarray(normal_scores, dtype=np.float32)
+    if method == "quantile":
+        return float(np.quantile(normal_scores, quantile))
+    if method == "mean_std":
+        return float(normal_scores.mean() + mean_std_k * normal_scores.std())
+    raise ValueError(f"Unsupported anomaly threshold method: {method}")
+
+
+def export_prediction_records(records, output_path, raw_threshold=None, casewise_scores=None, casewise_threshold=None):
+    enriched_records = []
+    for idx, record in enumerate(records):
+        row = dict(record)
+        row["pred_label_raw"] = (
+            int(float(row["anomaly_score"]) >= raw_threshold) if raw_threshold is not None else ""
+        )
+        if casewise_scores is not None and idx < len(casewise_scores):
+            casewise_score = float(casewise_scores[idx])
+            row["casewise_score"] = casewise_score
+            row["pred_label_casewise"] = (
+                int(casewise_score >= casewise_threshold) if casewise_threshold is not None else ""
+            )
+        enriched_records.append(to_serializable(row))
+
+    fieldnames = []
+    for row in enriched_records:
+        for key in row.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
+
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(enriched_records)
 
 
 def _print_final_metrics(title, metrics, threshold=None):
@@ -775,6 +888,7 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     context = build_training_context(cfg)
 
     device = context["device"]
+    chr_to_idx = context["chr_to_idx"]
     use_chromosome_id = context["use_chromosome_id"]
     use_pair_input = context["use_pair_input"]
     train_loader = context["train_loader"]
@@ -799,6 +913,15 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     calibration_cfg = cfg.get("calibration", {})
     calibration_enabled = calibration_cfg.get("enabled", True)
     calibration_method = calibration_cfg.get("method", "zscore")
+    anomaly_threshold_cfg = cfg.get("anomaly_threshold", {})
+    anomaly_threshold_enabled = anomaly_threshold_cfg.get("enabled", False)
+    anomaly_threshold_method = anomaly_threshold_cfg.get("method", "quantile")
+    anomaly_threshold_quantile = anomaly_threshold_cfg.get("quantile", 0.99)
+    anomaly_threshold_mean_std_k = anomaly_threshold_cfg.get("mean_std_k", 3.0)
+    anomaly_threshold_use_casewise = anomaly_threshold_cfg.get("use_casewise_scores", False)
+
+    if anomaly_threshold_enabled and anomaly_threshold_use_casewise and not calibration_enabled:
+        raise ValueError("anomaly_threshold.use_casewise_scores=True requires calibration.enabled=True")
 
     # split isolation summary
     split_summary = summarize_case_isolation(
@@ -823,7 +946,7 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
             style_consistency_cfg=style_consistency_cfg,
         )
 
-        val_metrics, y_true, y_score, val_case_ids = evaluate_multi_prototype_metric(
+        val_metrics, y_true, y_score, val_case_ids, _ = evaluate_multi_prototype_metric(
             model,
             val_loader,
             criterion,
@@ -876,7 +999,7 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     _safe_load_state_dict(model, best_path, device)
 
     # ---------- raw val ----------
-    val_metrics_05, val_y_true, val_y_score, val_case_ids = evaluate_multi_prototype_metric(
+    val_metrics_05, val_y_true, val_y_score, val_case_ids, val_records = evaluate_multi_prototype_metric(
         model,
         val_loader,
         criterion,
@@ -893,7 +1016,7 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     )
 
     # ---------- raw test ----------
-    test_metrics_05, test_y_true, test_y_score, test_case_ids = evaluate_multi_prototype_metric(
+    test_metrics_05, test_y_true, test_y_score, test_case_ids, test_records = evaluate_multi_prototype_metric(
         model,
         test_loader,
         criterion,
@@ -902,7 +1025,7 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
         use_chromosome_id=use_chromosome_id,
         use_pair_input=use_pair_input,
     )
-    test_metrics_best, _, _, _ = evaluate_multi_prototype_metric(
+    test_metrics_best, _, _, _, _ = evaluate_multi_prototype_metric(
         model,
         test_loader,
         criterion,
@@ -923,6 +1046,8 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     casewise_best_th = None
     casewise_best_score = None
     casewise_best_stats = None
+    val_casewise_scores = None
+    test_casewise_scores = None
 
     if calibration_enabled and len(val_case_ids) == len(val_y_score) and len(test_case_ids) == len(test_y_score):
         val_casewise_metrics_05, val_casewise_scores = evaluate_casewise_calibration(
@@ -987,6 +1112,109 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
     else:
         print("\nCase-wise calibration skipped: missing usable case_id in val/test.")
 
+    anomaly_threshold = None
+    anomaly_threshold_stats = None
+    anomaly_threshold_source = None
+    test_metrics_anomaly_threshold = None
+    test_casewise_metrics_anomaly_threshold = None
+    train_eval_records = None
+    train_eval_casewise_scores = None
+
+    if anomaly_threshold_enabled:
+        train_eval_loader = build_eval_loader_for_csv(cfg, cfg["data"]["train_csv"], chr_to_idx)
+        _, train_y_true, train_y_score, train_case_ids, train_eval_records = evaluate_multi_prototype_metric(
+            model,
+            train_eval_loader,
+            criterion,
+            device,
+            threshold=0.5,
+            use_chromosome_id=use_chromosome_id,
+            use_pair_input=use_pair_input,
+        )
+
+        threshold_scores = train_y_score
+        anomaly_threshold_source = "train_normal_raw"
+
+        if anomaly_threshold_use_casewise:
+            if len(train_case_ids) != len(train_y_score) or len(train_case_ids) == 0:
+                raise ValueError("anomaly_threshold.use_casewise_scores=True requires case_id for every train sample")
+            train_eval_casewise_scores = calibrate_scores_casewise(
+                scores=train_y_score,
+                case_ids=train_case_ids,
+                method=calibration_method,
+            )
+            threshold_scores = train_eval_casewise_scores
+            anomaly_threshold_source = f"train_normal_casewise_{calibration_method}"
+
+        anomaly_threshold = estimate_normal_threshold(
+            y_true=train_y_true,
+            y_score=threshold_scores,
+            method=anomaly_threshold_method,
+            quantile=anomaly_threshold_quantile,
+            mean_std_k=anomaly_threshold_mean_std_k,
+        )
+
+        anomaly_threshold_stats = {
+            "source": anomaly_threshold_source,
+            "method": anomaly_threshold_method,
+            "quantile": anomaly_threshold_quantile,
+            "mean_std_k": anomaly_threshold_mean_std_k,
+            "use_casewise_scores": anomaly_threshold_use_casewise,
+            "threshold": anomaly_threshold,
+        }
+
+        if anomaly_threshold is not None:
+            test_scores_for_anomaly_threshold = (
+                test_casewise_scores if anomaly_threshold_use_casewise else test_y_score
+            )
+            if test_scores_for_anomaly_threshold is None:
+                raise ValueError("Failed to build scores for anomaly_threshold evaluation")
+            test_metrics_anomaly_threshold = compute_score_based_metrics(
+                y_true=test_y_true,
+                y_score=test_scores_for_anomaly_threshold,
+                threshold=anomaly_threshold,
+                higher_score_more_positive=True,
+            )
+            test_metrics_anomaly_threshold["loss"] = test_metrics_05["loss"]
+
+            if anomaly_threshold_use_casewise:
+                test_casewise_metrics_anomaly_threshold = test_metrics_anomaly_threshold
+
+            print("\n" + "=" * 80)
+            print(
+                f"Train-normal threshold enabled: source={anomaly_threshold_source}, "
+                f"method={anomaly_threshold_method}, threshold={anomaly_threshold:.6f}"
+            )
+            print("=" * 80)
+            _print_final_metrics(
+                "Test Metrics (train-normal threshold)",
+                test_metrics_anomaly_threshold,
+                threshold=anomaly_threshold,
+            )
+
+    export_prediction_records(
+        val_records,
+        os.path.join(save_dir, "val_predictions.csv"),
+        raw_threshold=best_th,
+        casewise_scores=val_casewise_scores,
+        casewise_threshold=casewise_best_th,
+    )
+    export_prediction_records(
+        test_records,
+        os.path.join(save_dir, "test_predictions.csv"),
+        raw_threshold=best_th,
+        casewise_scores=test_casewise_scores,
+        casewise_threshold=casewise_best_th,
+    )
+    if train_eval_records is not None:
+        export_prediction_records(
+            train_eval_records,
+            os.path.join(save_dir, "train_predictions.csv"),
+            raw_threshold=anomaly_threshold,
+            casewise_scores=train_eval_casewise_scores,
+            casewise_threshold=anomaly_threshold if anomaly_threshold_use_casewise else None,
+        )
+
     results = {
         "experiment_mode": "multi_prototype_metric",
         "config_path": config_path,
@@ -1017,6 +1245,10 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
         "casewise_best_threshold": casewise_best_th,
         "casewise_best_threshold_score": casewise_best_score,
         "casewise_best_threshold_stats": casewise_best_stats,
+        "anomaly_threshold": anomaly_threshold,
+        "anomaly_threshold_stats": anomaly_threshold_stats,
+        "test_metrics_anomaly_threshold": test_metrics_anomaly_threshold,
+        "test_casewise_metrics_anomaly_threshold": test_casewise_metrics_anomaly_threshold,
     }
 
     results_path = os.path.join(save_dir, "results.yaml")
