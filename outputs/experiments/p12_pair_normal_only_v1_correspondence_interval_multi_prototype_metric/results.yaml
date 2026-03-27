@@ -1,0 +1,231 @@
+experiment_mode: multi_prototype_metric
+config_path: configs/p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric.yaml
+experiment_name: p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric
+save_dir: outputs/experiments/p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric
+best_model_path: outputs/experiments/p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric/best_model.pth
+best_model_metric: auprc
+best_model_metric_value: 0.16641779765788411
+best_threshold: 0.0014118028046497747
+best_threshold_score: 0.22278481012658224
+best_threshold_stats:
+  precision: 0.1506849315068493
+  recall: 0.42718446601941745
+  f1: 0.22278481012658224
+  balanced_acc: 0.6586276940026166
+split_summary:
+  train_csv: data_protocol/p12_pair_normal_only_v1/train.csv
+  val_csv: data_protocol/p12_pair_normal_only_v1/val.csv
+  test_csv: data_protocol/p12_pair_normal_only_v1/test.csv
+  train_has_case_id: true
+  train_num_cases: 20
+  val_has_case_id: true
+  val_num_cases: 6
+  test_has_case_id: true
+  test_num_cases: 6
+  case_isolation_checkable: true
+  train_val_overlap_cases: []
+  train_test_overlap_cases: []
+  val_test_overlap_cases: []
+  num_train_val_overlap: 0
+  num_train_test_overlap: 0
+  num_val_test_overlap: 0
+  is_case_isolated: true
+model_settings:
+  num_prototypes: 4
+  prototype_distance: cosine
+  normalize_prototype_embedding: true
+loss_settings:
+  name: ce
+  metric:
+    cls_weight: 0.0
+    normal_weight: 1.0
+    abnormal_weight: 0.0
+    abnormal_margin: 0.35
+    diversity_weight: 0.05
+    diversity_margin: 0.2
+    structure_weight: 0.0
+style_consistency: {}
+calibration:
+  enabled: true
+  method: zscore
+val_metrics_05:
+  auroc: 0.8232738587068789
+  auprc: 0.16641779765788411
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2256
+    fp: 0
+    fn: 103
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9563374311148792
+    recall: 1.0
+    f1: 0.9776814734561213
+    support: 2256
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 103
+  loss: 0.0011359941886561074
+test_metrics_05:
+  auroc: 0.7631112977522252
+  auprc: 0.34032102440594686
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2221
+    fp: 0
+    fn: 104
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9552688172043011
+    recall: 1.0
+    f1: 0.9771227452705675
+    support: 2221
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 104
+  loss: 0.0010355513023152466
+test_metrics_best:
+  auroc: 0.7631112977522252
+  auprc: 0.34032102440594686
+  f1: 0.2796208530805687
+  precision_abnormal: 0.18553459119496854
+  recall_abnormal: 0.5673076923076923
+  balanced_acc: 0.7253467772659579
+  confusion_matrix:
+    tn: 1962
+    fp: 259
+    fn: 45
+    tp: 59
+  normal:
+    acc: 0.8833858622242233
+    precision: 0.9775784753363229
+    recall: 0.8833858622242233
+    f1: 0.9280983916745505
+    support: 2221
+  abnormal:
+    acc: 0.5673076923076923
+    precision: 0.18553459119496854
+    recall: 0.5673076923076923
+    f1: 0.2796208530805687
+    support: 104
+  loss: 0.0010355513023152466
+val_casewise_metrics_05:
+  auroc: 0.8005233078565035
+  auprc: 0.15574899476544068
+  f1: 0.19428571428571428
+  precision_abnormal: 0.2361111111111111
+  recall_abnormal: 0.1650485436893204
+  balanced_acc: 0.5703345555326035
+  confusion_matrix:
+    tn: 2201
+    fp: 55
+    fn: 86
+    tp: 17
+  normal:
+    acc: 0.9756205673758865
+    precision: 0.9623961521644075
+    recall: 0.9756205673758865
+    f1: 0.9689632401496808
+    support: 2256
+  abnormal:
+    acc: 0.1650485436893204
+    precision: 0.2361111111111111
+    recall: 0.1650485436893204
+    f1: 0.19428571428571428
+    support: 103
+val_casewise_best:
+  auroc: 0.8005233078565035
+  auprc: 0.15574899476544068
+  f1: 0.20544554455445546
+  precision_abnormal: 0.11773049645390071
+  recall_abnormal: 0.8058252427184466
+  balanced_acc: 0.7650580114301453
+  confusion_matrix:
+    tn: 1634
+    fp: 622
+    fn: 20
+    tp: 83
+  normal:
+    acc: 0.724290780141844
+    precision: 0.9879081015719468
+    recall: 0.724290780141844
+    f1: 0.8358056265984655
+    support: 2256
+  abnormal:
+    acc: 0.8058252427184466
+    precision: 0.11773049645390071
+    recall: 0.8058252427184466
+    f1: 0.20544554455445546
+    support: 103
+  loss: 0.0011359941886561074
+test_casewise_metrics_05:
+  auroc: 0.745705330239324
+  auprc: 0.24483054765082654
+  f1: 0.3451327433628319
+  precision_abnormal: 0.319672131147541
+  recall_abnormal: 0.375
+  balanced_acc: 0.6688147230977037
+  confusion_matrix:
+    tn: 2138
+    fp: 83
+    fn: 65
+    tp: 39
+  normal:
+    acc: 0.9626294461954075
+    precision: 0.970494779845665
+    recall: 0.9626294461954075
+    f1: 0.9665461121157325
+    support: 2221
+  abnormal:
+    acc: 0.375
+    precision: 0.319672131147541
+    recall: 0.375
+    f1: 0.3451327433628319
+    support: 104
+  loss: 0.0010355513023152466
+test_casewise_best:
+  auroc: 0.745705330239324
+  auprc: 0.24483054765082654
+  f1: 0.20916905444126074
+  precision_abnormal: 0.12289562289562289
+  recall_abnormal: 0.7019230769230769
+  balanced_acc: 0.7336720292314619
+  confusion_matrix:
+    tn: 1700
+    fp: 521
+    fn: 31
+    tp: 73
+  normal:
+    acc: 0.765420981539847
+    precision: 0.9820912767186597
+    recall: 0.765420981539847
+    f1: 0.8603238866396762
+    support: 2221
+  abnormal:
+    acc: 0.7019230769230769
+    precision: 0.12289562289562289
+    recall: 0.7019230769230769
+    f1: 0.20916905444126074
+    support: 104
+  loss: 0.0010355513023152466
+casewise_best_threshold: -0.08900122136855093
+casewise_best_threshold_score: 0.20544554455445546
+casewise_best_threshold_stats:
+  precision: 0.11773049645390071
+  recall: 0.8058252427184466
+  f1: 0.20544554455445546
+  balanced_acc: 0.7650580114301453

@@ -1,0 +1,4 @@
+split,total_pairs,normal_pairs,abnormal_pairs,cases
+train,11814,11814,0,20
+val,2359,2256,103,6
+test,2325,2221,104,6
