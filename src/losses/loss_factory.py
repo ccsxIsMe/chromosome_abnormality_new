@@ -520,6 +520,8 @@ class MultiPrototypeMetricLoss(nn.Module):
         abnormal_margin=0.35,
         diversity_weight=0.05,
         diversity_margin=0.2,
+        normal_chr_contrastive_weight=0.0,
+        normal_chr_contrastive_temperature=0.07,
         structure_weight=0.0,
         pericentric_weight=1.0,
         arm_weight=1.0,
@@ -534,6 +536,11 @@ class MultiPrototypeMetricLoss(nn.Module):
         self.abnormal_margin = abnormal_margin
         self.diversity_weight = diversity_weight
         self.diversity_margin = diversity_margin
+        self.normal_chr_contrastive_weight = normal_chr_contrastive_weight
+        self.normal_chr_contrastive = BalancedSupConLoss(
+            temperature=normal_chr_contrastive_temperature,
+            eps=eps,
+        )
         self.structure_weight = structure_weight
         self.pericentric_weight = pericentric_weight
         self.arm_weight = arm_weight
@@ -595,6 +602,16 @@ class MultiPrototypeMetricLoss(nn.Module):
         if abnormal_mask.any():
             abnormal_term = F.relu(self.abnormal_margin - min_dist[abnormal_mask]).mean()
             total_loss = total_loss + self.abnormal_weight * abnormal_term
+
+        if self.normal_chr_contrastive_weight > 0 and batch is not None:
+            embeddings = extract_embeddings(model_output)
+            chr_idx = batch.get("chr_idx")
+            if embeddings is not None and chr_idx is not None and normal_mask.any():
+                normal_embeddings = embeddings[normal_mask]
+                normal_chr_idx = chr_idx.to(min_dist.device)[normal_mask]
+                if normal_embeddings.size(0) >= 2:
+                    contrastive_term = self.normal_chr_contrastive(normal_embeddings, normal_chr_idx)
+                    total_loss = total_loss + self.normal_chr_contrastive_weight * contrastive_term
 
         if self.structure_weight > 0 and batch is not None:
             structure_logits = extract_structure_logits(model_output)
@@ -695,6 +712,8 @@ def build_loss(loss_cfg, device, experiment_mode="classifier", model=None):
             abnormal_margin=metric_cfg.get("abnormal_margin", 0.35),
             diversity_weight=metric_cfg.get("diversity_weight", 0.05),
             diversity_margin=metric_cfg.get("diversity_margin", 0.2),
+            normal_chr_contrastive_weight=metric_cfg.get("normal_chr_contrastive_weight", 0.0),
+            normal_chr_contrastive_temperature=metric_cfg.get("normal_chr_contrastive_temperature", 0.07),
             structure_weight=metric_cfg.get("structure_weight", 0.0),
             pericentric_weight=metric_cfg.get("pericentric_weight", 1.0),
             arm_weight=metric_cfg.get("arm_weight", 1.0),
