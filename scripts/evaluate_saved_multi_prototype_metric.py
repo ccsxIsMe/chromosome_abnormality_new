@@ -70,6 +70,31 @@ def summarize_by_subtype(df, score_col, threshold):
     return rows
 
 
+def evaluate_threshold_strategy(
+    train_y_true,
+    train_scores,
+    test_y_true,
+    test_scores,
+    method,
+    quantile,
+    mean_std_k,
+):
+    threshold = estimate_normal_threshold(
+        y_true=train_y_true,
+        y_score=train_scores,
+        method=method,
+        quantile=quantile,
+        mean_std_k=mean_std_k,
+    )
+    metrics = compute_score_based_metrics(
+        y_true=test_y_true,
+        y_score=test_scores,
+        threshold=threshold,
+        higher_score_more_positive=True,
+    )
+    return float(threshold), metrics
+
+
 def build_model_from_config(cfg, chr_to_idx, device):
     return build_model(
         model_name=cfg["model"]["name"],
@@ -120,6 +145,10 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--ckpt", required=True)
     parser.add_argument("--save_dir", default=None)
+    parser.add_argument("--sweep_quantiles", default="0.95,0.975,0.99")
+    parser.add_argument("--sweep_mean_std_k", default="2.0,2.5,3.0")
+    parser.add_argument("--disable_quantile_sweep", action="store_true")
+    parser.add_argument("--disable_mean_std_sweep", action="store_true")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -148,6 +177,13 @@ def main():
 
     save_dir = args.save_dir or default_save_dir(args.config, args.ckpt)
     os.makedirs(save_dir, exist_ok=True)
+
+    sweep_quantiles = [
+        float(x.strip()) for x in str(args.sweep_quantiles).split(",") if str(x).strip()
+    ]
+    sweep_mean_std_k = [
+        float(x.strip()) for x in str(args.sweep_mean_std_k).split(",") if str(x).strip()
+    ]
 
     split_summary = summarize_case_isolation(
         train_csv=cfg["data"]["train_csv"],
@@ -281,6 +317,7 @@ def main():
     anomaly_threshold = None
     anomaly_threshold_stats = None
     test_metrics_anomaly_threshold = None
+    threshold_sweep = []
 
     if anomaly_threshold_enabled:
         threshold_scores = train_y_score
@@ -319,6 +356,96 @@ def main():
             "use_casewise_scores": anomaly_threshold_use_casewise,
             "threshold": anomaly_threshold,
         }
+
+    sweep_sources = [
+        {
+            "score_name": "raw",
+            "train_scores": train_y_score,
+            "test_scores": test_y_score,
+        }
+    ]
+    if train_casewise_scores is not None and test_casewise_scores is not None:
+        sweep_sources.append(
+            {
+                "score_name": f"casewise_{calibration_method}",
+                "train_scores": train_casewise_scores,
+                "test_scores": test_casewise_scores,
+            }
+        )
+
+    for source in sweep_sources:
+        if not args.disable_quantile_sweep:
+            for quantile in sweep_quantiles:
+                threshold, metrics = evaluate_threshold_strategy(
+                    train_y_true=train_y_true,
+                    train_scores=source["train_scores"],
+                    test_y_true=test_y_true,
+                    test_scores=source["test_scores"],
+                    method="quantile",
+                    quantile=quantile,
+                    mean_std_k=3.0,
+                )
+                metrics["loss"] = test_metrics_05["loss"]
+                threshold_sweep.append(
+                    {
+                        "score_name": source["score_name"],
+                        "threshold_family": "quantile",
+                        "quantile": quantile,
+                        "mean_std_k": None,
+                        "threshold": threshold,
+                        "auroc": metrics["auroc"],
+                        "auprc": metrics["auprc"],
+                        "f1": metrics["f1"],
+                        "precision_abnormal": metrics["precision_abnormal"],
+                        "recall_abnormal": metrics["recall_abnormal"],
+                        "balanced_acc": metrics["balanced_acc"],
+                        "tn": metrics["confusion_matrix"]["tn"],
+                        "fp": metrics["confusion_matrix"]["fp"],
+                        "fn": metrics["confusion_matrix"]["fn"],
+                        "tp": metrics["confusion_matrix"]["tp"],
+                    }
+                )
+
+        if not args.disable_mean_std_sweep:
+            for mean_std_k in sweep_mean_std_k:
+                threshold, metrics = evaluate_threshold_strategy(
+                    train_y_true=train_y_true,
+                    train_scores=source["train_scores"],
+                    test_y_true=test_y_true,
+                    test_scores=source["test_scores"],
+                    method="mean_std",
+                    quantile=0.99,
+                    mean_std_k=mean_std_k,
+                )
+                metrics["loss"] = test_metrics_05["loss"]
+                threshold_sweep.append(
+                    {
+                        "score_name": source["score_name"],
+                        "threshold_family": "mean_std",
+                        "quantile": None,
+                        "mean_std_k": mean_std_k,
+                        "threshold": threshold,
+                        "auroc": metrics["auroc"],
+                        "auprc": metrics["auprc"],
+                        "f1": metrics["f1"],
+                        "precision_abnormal": metrics["precision_abnormal"],
+                        "recall_abnormal": metrics["recall_abnormal"],
+                        "balanced_acc": metrics["balanced_acc"],
+                        "tn": metrics["confusion_matrix"]["tn"],
+                        "fp": metrics["confusion_matrix"]["fp"],
+                        "fn": metrics["confusion_matrix"]["fn"],
+                        "tp": metrics["confusion_matrix"]["tp"],
+                    }
+                )
+
+    threshold_sweep = sorted(
+        threshold_sweep,
+        key=lambda row: (
+            -float(row["f1"]),
+            -float(row["recall_abnormal"]),
+            float(row["fp"]),
+        ),
+    )
 
     export_prediction_records(
         val_records,
@@ -411,14 +538,21 @@ def main():
             test_df[test_df["subtype_status"] == "unseen"], "casewise_score", anomaly_threshold
         )
 
+    summary["threshold_sweep"] = threshold_sweep
+
     results_path = os.path.join(save_dir, "results.yaml")
     with open(results_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(to_serializable(summary), f, allow_unicode=True, sort_keys=False)
+
+    if len(threshold_sweep) > 0:
+        pd.DataFrame(threshold_sweep).to_csv(os.path.join(save_dir, "threshold_sweep.csv"), index=False)
 
     print(f"Saved posthoc evaluation to {results_path}")
     print(f"Saved train predictions to {os.path.join(save_dir, 'train_predictions.csv')}")
     print(f"Saved val predictions to {os.path.join(save_dir, 'val_predictions.csv')}")
     print(f"Saved test predictions to {os.path.join(save_dir, 'test_predictions.csv')}")
+    if len(threshold_sweep) > 0:
+        print(f"Saved threshold sweep to {os.path.join(save_dir, 'threshold_sweep.csv')}")
 
 
 if __name__ == "__main__":
