@@ -135,7 +135,8 @@ def sample_patches(patch_embeddings, max_patches_per_image, generator):
     num_patches = patch_embeddings.size(0)
     if num_patches <= max_patches_per_image:
         return patch_embeddings
-    indices = torch.randperm(num_patches, generator=generator, device=patch_embeddings.device)[:max_patches_per_image]
+    indices = torch.randperm(num_patches, generator=generator)[:max_patches_per_image]
+    indices = indices.to(device=patch_embeddings.device)
     return patch_embeddings[indices]
 
 
