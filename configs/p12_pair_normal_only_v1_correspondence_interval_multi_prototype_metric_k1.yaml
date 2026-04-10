@@ -45,6 +45,11 @@ calibration:
   enabled: true
   method: zscore
 
+anomaly_threshold:
+  enabled: true
+  method: quantile
+  quantile: 0.99
+
 output:
   save_dir: outputs/experiments
 
