@@ -670,6 +670,30 @@ def export_prediction_records(records, output_path, raw_threshold=None, casewise
         writer.writerows(enriched_records)
 
 
+def _format_metric_value(value):
+    if isinstance(value, (int, np.integer)):
+        return str(int(value))
+    if isinstance(value, (float, np.floating)):
+        return f"{float(value):.4f}"
+    return str(value)
+
+
+def _print_score_summary(title, metrics, threshold=None, fields=None):
+    if fields is None:
+        fields = ["auroc", "auprc", "loss"]
+
+    prefix = title if threshold is None else f"{title} @ threshold={threshold:.4f}"
+    parts = []
+    for field in fields:
+        if field in metrics and metrics[field] is not None:
+            parts.append(f"{field}={_format_metric_value(metrics[field])}")
+
+    if parts:
+        print(f"{prefix}: " + ", ".join(parts))
+    else:
+        print(prefix)
+
+
 def _print_final_metrics(title, metrics, threshold=None):
     print("\n" + "=" * 80)
     if threshold is None:
@@ -977,7 +1001,14 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
         scheduler.step()
 
         print(f"Train Logs: {train_logs}")
-        print(f"Val Metrics (multi-prototype anomaly score @0.5): {val_metrics}")
+        _print_score_summary(
+            "Val ranking summary",
+            val_metrics,
+            threshold=0.5,
+            fields=["auroc", "auprc", "loss"],
+        )
+        if best_metric_name in val_metrics:
+            print(f"Checkpoint metric ({best_metric_name}): {_format_metric_value(val_metrics[best_metric_name])}")
         print(f"Best Val Threshold: {best_th:.4f}, Best F1: {best_score:.4f}, Stats: {best_stats}")
 
         if cal_best_th is not None:
@@ -1035,7 +1066,12 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
         use_pair_input=use_pair_input,
     )
 
-    _print_final_metrics("Final Test Metrics", test_metrics_05, threshold=0.5)
+    _print_score_summary(
+        "Final Test Ranking Summary",
+        test_metrics_05,
+        threshold=0.5,
+        fields=["auroc", "auprc", "loss"],
+    )
     _print_final_metrics("Final Test Metrics", test_metrics_best, threshold=best_th)
 
     # ---------- case-wise calibrated evaluation ----------
@@ -1099,10 +1135,11 @@ def run_multi_prototype_metric_experiment(cfg, config_path=None):
         print("\n" + "=" * 80)
         print(f"Case-wise calibration enabled: method={calibration_method}")
         print("=" * 80)
-        _print_final_metrics(
-            f"Case-wise calibrated Test Metrics ({calibration_method})",
+        _print_score_summary(
+            f"Case-wise calibrated Test Ranking Summary ({calibration_method})",
             test_casewise_metrics_05,
             threshold=0.5,
+            fields=["auroc", "auprc", "loss"],
         )
         _print_final_metrics(
             f"Case-wise calibrated Test Metrics ({calibration_method})",

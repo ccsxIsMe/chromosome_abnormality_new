@@ -253,6 +253,49 @@ def summarize_by_subtype(df, pred_column, score_column):
     return rows
 
 
+def build_compact_results(
+    score_mode,
+    quantiles,
+    global_eval,
+    chr_eval,
+    test_seen_global,
+    test_unseen_global,
+    test_seen_chr,
+    test_unseen_chr,
+    calibrated_test_df,
+):
+    return {
+        "method": "p12_chr_conditioned_posthoc",
+        "score_mode": score_mode,
+        "quantiles": quantiles,
+        "global_eval": {
+            "val_best_threshold": float(global_eval["val_best_threshold"]),
+            "val_best_score": float(global_eval["val_best_score"]),
+            "val_best_stats": global_eval["val_best_stats"],
+            "test_metrics_val_best": global_eval["test_metrics_val_best"],
+        },
+        "chr_eval": {
+            "best_quantile_from_val": float(chr_eval["best_quantile_from_val"]),
+            "fallback_threshold": float(chr_eval["fallback_threshold"]),
+            "test_metrics_best_chr": chr_eval["test_metrics_best_chr"],
+        },
+        "test_seen_global_valbest": test_seen_global,
+        "test_unseen_global_valbest": test_unseen_global,
+        "test_seen_chr_conditioned": test_seen_chr,
+        "test_unseen_chr_conditioned": test_unseen_chr,
+        "test_by_subtype_global_valbest": summarize_by_subtype(
+            calibrated_test_df,
+            pred_column="pred_label_global_valbest",
+            score_column="calibrated_score",
+        ),
+        "test_by_subtype_chr_conditioned": summarize_by_subtype(
+            calibrated_test_df,
+            pred_column="pred_label_chr_conditioned",
+            score_column="calibrated_score",
+        ),
+    }
+
+
 def run_global_threshold_eval(train_df, val_df, test_df, quantiles):
     best_threshold, best_score, best_stats = search_best_threshold(
         y_true=val_df["label"].astype(int).tolist(),
@@ -465,7 +508,7 @@ def main():
         test_seen_chr = None
         test_unseen_chr = None
 
-    results = {
+    results_full = {
         "method": "p12_chr_conditioned_posthoc",
         "score_mode": args.score_mode,
         "quantiles": quantiles,
@@ -488,6 +531,17 @@ def main():
             score_column="calibrated_score",
         ),
     }
+    results = build_compact_results(
+        score_mode=args.score_mode,
+        quantiles=quantiles,
+        global_eval=global_eval,
+        chr_eval=chr_eval,
+        test_seen_global=test_seen_global,
+        test_unseen_global=test_unseen_global,
+        test_seen_chr=test_seen_chr,
+        test_unseen_chr=test_unseen_chr,
+        calibrated_test_df=calibrated_test_df,
+    )
 
     train_df.to_csv(output_dir / "train_predictions_chr_calibrated.csv", index=False)
     val_df.to_csv(output_dir / "val_predictions_chr_calibrated.csv", index=False)
@@ -507,10 +561,13 @@ def main():
 
     with open(output_dir / "results.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(to_serializable(results), f, allow_unicode=True, sort_keys=False)
+    with open(output_dir / "results_full.yaml", "w", encoding="utf-8") as f:
+        yaml.safe_dump(to_serializable(results_full), f, allow_unicode=True, sort_keys=False)
 
     write_summary_table(output_dir / "summary_table.md", args.score_mode, global_eval, chr_eval)
 
     print(f"Saved chromosome-conditioned posthoc results to {output_dir / 'results.yaml'}")
+    print(f"Saved full chromosome-conditioned posthoc results to {output_dir / 'results_full.yaml'}")
     print(f"Saved global sweep to {output_dir / 'global_quantile_sweep.csv'}")
     print(f"Saved chromosome-conditioned sweep to {output_dir / 'chr_quantile_sweep.csv'}")
 
