@@ -1,4 +1,4 @@
-experiment_name: p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric_k1
+experiment_name: p12_pair_normal_only_v1_correspondence_interval_multi_prototype_metric_ablate_k48
 
 experiment_mode: multi_prototype_metric
 
@@ -20,7 +20,7 @@ model:
   use_pair_input: true
   pair_model_type: correspondence_interval
   chr_embed_dim: 16
-  num_prototypes: 1
+  num_prototypes: 48
   prototype_distance: cosine
   normalize_prototype_embedding: true
 
@@ -44,11 +44,6 @@ loss:
 calibration:
   enabled: true
   method: zscore
-
-anomaly_threshold:
-  enabled: true
-  method: quantile
-  quantile: 0.99
 
 output:
   save_dir: outputs/experiments
