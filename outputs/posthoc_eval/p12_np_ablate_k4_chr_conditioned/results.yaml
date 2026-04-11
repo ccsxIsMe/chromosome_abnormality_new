@@ -1,0 +1,263 @@
+method: p12_chr_conditioned_posthoc
+score_mode: chr_zscore
+quantiles:
+- 0.95
+- 0.975
+- 0.99
+global_eval:
+  val_best_threshold: 5.107723627505239
+  val_best_score: 0.3474178403755869
+  val_best_stats:
+    precision: 0.33636363636363636
+    recall: 0.3592233009708738
+    f1: 0.3474178403755869
+    balanced_acc: 0.6634325724712525
+  test_metrics_val_best:
+    auroc: 0.8065883351227792
+    auprc: 0.3921499607259911
+    f1: 0.5232067510548523
+    precision_abnormal: 0.46616541353383456
+    recall_abnormal: 0.5961538461538461
+    balanced_acc: 0.7820931319918263
+    confusion_matrix:
+      tn: 2150
+      fp: 71
+      fn: 42
+      tp: 62
+    normal:
+      acc: 0.9680324178298064
+      precision: 0.9808394160583942
+      recall: 0.9680324178298064
+      f1: 0.9743938363924768
+      support: 2221
+    abnormal:
+      acc: 0.5961538461538461
+      precision: 0.46616541353383456
+      recall: 0.5961538461538461
+      f1: 0.5232067510548523
+      support: 104
+chr_eval:
+  best_quantile_from_val: 0.99
+  fallback_threshold: 2.6056199950336443
+  test_metrics_best_chr:
+    auroc: 0.8065883351227792
+    auprc: 0.3921499607259911
+    f1: 0.474820143884892
+    precision_abnormal: 0.3793103448275862
+    recall_abnormal: 0.6346153846153846
+    balanced_acc: 0.7929943199528972
+    confusion_matrix:
+      tn: 2113
+      fp: 108
+      fn: 38
+      tp: 66
+    normal:
+      acc: 0.9513732552904097
+      precision: 0.9823337982333799
+      recall: 0.9513732552904097
+      f1: 0.9666056724611163
+      support: 2221
+    abnormal:
+      acc: 0.6346153846153846
+      precision: 0.3793103448275862
+      recall: 0.6346153846153846
+      f1: 0.474820143884892
+      support: 104
+test_seen_global_valbest:
+  auroc: null
+  auprc: 1.0000000000000002
+  f1: 0.5185185185185185
+  precision_abnormal: 1.0
+  recall_abnormal: 0.35
+  balanced_acc: 0.175
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 13
+    tp: 7
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.35
+    precision: 1.0
+    recall: 0.35
+    f1: 0.5185185185185185
+    support: 20
+  count: 20
+test_unseen_global_valbest:
+  auroc: null
+  auprc: 0.9999999999999999
+  f1: 0.7913669064748202
+  precision_abnormal: 1.0
+  recall_abnormal: 0.6547619047619048
+  balanced_acc: 0.3273809523809524
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 29
+    tp: 55
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.6547619047619048
+    precision: 1.0
+    recall: 0.6547619047619048
+    f1: 0.7913669064748202
+    support: 84
+  count: 84
+test_seen_chr_conditioned:
+  auroc: null
+  auprc: 1.0000000000000002
+  f1: 0.5185185185185185
+  precision_abnormal: 1.0
+  recall_abnormal: 0.35
+  balanced_acc: 0.175
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 13
+    tp: 7
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.35
+    precision: 1.0
+    recall: 0.35
+    f1: 0.5185185185185185
+    support: 20
+  count: 20
+test_unseen_chr_conditioned:
+  auroc: null
+  auprc: 0.9999999999999999
+  f1: 0.8251748251748251
+  precision_abnormal: 1.0
+  recall_abnormal: 0.7023809523809523
+  balanced_acc: 0.35119047619047616
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 25
+    tp: 59
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.7023809523809523
+    precision: 1.0
+    recall: 0.7023809523809523
+    f1: 0.8251748251748251
+    support: 84
+  count: 84
+test_by_subtype_global_valbest:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.25
+  mean_score: 7.654137691984966
+  min_score: -1.179943543018826
+  max_score: 32.71932664009485
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.53125
+  mean_score: 53.82956917582066
+  min_score: -1.0193241041784673
+  max_score: 169.14407299124545
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  mean_score: 0.2984773727162275
+  min_score: -1.3533726021106949
+  max_score: 1.631643372563682
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  mean_score: 235.00599181795963
+  min_score: 15.619276632340453
+  max_score: 432.845439651856
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  mean_score: 66.1882701359965
+  min_score: 5.498191273794671
+  max_score: 206.63176269293163
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.17647058823529413
+  mean_score: 14.645315241257837
+  min_score: -0.9471405161658215
+  max_score: 196.14790898163238
+test_by_subtype_chr_conditioned:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.25
+  mean_score: 7.654137691984966
+  min_score: -1.179943543018826
+  max_score: 32.71932664009485
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.5625
+  mean_score: 53.82956917582066
+  min_score: -1.0193241041784673
+  max_score: 169.14407299124545
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  mean_score: 0.2984773727162275
+  min_score: -1.3533726021106949
+  max_score: 1.631643372563682
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  mean_score: 235.00599181795963
+  min_score: 15.619276632340453
+  max_score: 432.845439651856
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  mean_score: 66.1882701359965
+  min_score: 5.498191273794671
+  max_score: 206.63176269293163
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.35294117647058826
+  mean_score: 14.645315241257837
+  min_score: -0.9471405161658215
+  max_score: 196.14790898163238
