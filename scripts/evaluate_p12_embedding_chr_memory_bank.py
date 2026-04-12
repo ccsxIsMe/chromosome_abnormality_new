@@ -342,7 +342,13 @@ def compute_metrics_from_predictions(y_true, y_score, y_pred):
 
     precision_abnormal = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall_abnormal = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    precision_normal = tn / (tn + fn) if (tn + fn) > 0 else 0.0
     recall_normal = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    f1_normal = (
+        2.0 * precision_normal * recall_normal / (precision_normal + recall_normal)
+        if (precision_normal + recall_normal) > 0
+        else 0.0
+    )
     f1_abnormal = (
         2.0 * precision_abnormal * recall_abnormal / (precision_abnormal + recall_abnormal)
         if (precision_abnormal + recall_abnormal) > 0
@@ -360,6 +366,20 @@ def compute_metrics_from_predictions(y_true, y_score, y_pred):
     metrics["recall_abnormal"] = float(recall_abnormal)
     metrics["balanced_acc"] = float(0.5 * (recall_normal + recall_abnormal))
     metrics["confusion_matrix"] = {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
+    metrics["normal"] = {
+        "acc": float(recall_normal),
+        "precision": float(precision_normal),
+        "recall": float(recall_normal),
+        "f1": float(f1_normal),
+        "support": int((y_true == 0).sum()),
+    }
+    metrics["abnormal"] = {
+        "acc": float(recall_abnormal),
+        "precision": float(precision_abnormal),
+        "recall": float(recall_abnormal),
+        "f1": float(f1_abnormal),
+        "support": int((y_true == 1).sum()),
+    }
     return metrics
 
 
