@@ -19,6 +19,16 @@ class ChromosomeBandRepresentation:
     valid_profile_fraction: float
 
 
+def moving_average_1d(values: np.ndarray, kernel_size: int = 5) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float32)
+    if values.size == 0 or kernel_size <= 1:
+        return values.astype(np.float32)
+    pad = kernel_size // 2
+    padded = np.pad(values, (pad, pad), mode="edge")
+    kernel = np.ones(kernel_size, dtype=np.float32) / float(kernel_size)
+    return np.convolve(padded, kernel, mode="valid").astype(np.float32)
+
+
 def load_grayscale_image(image_path: str) -> np.ndarray:
     image = Image.open(image_path).convert("L")
     return np.asarray(image, dtype=np.float32) / 255.0
@@ -178,7 +188,114 @@ def resample_1d(values: np.ndarray, target_length: int) -> np.ndarray:
     return np.interp(dst_x, src_x, values).astype(np.float32)
 
 
-def extract_band_profile(
+def bilinear_sample(image: np.ndarray, y_coords: np.ndarray, x_coords: np.ndarray, fill_value: float = 1.0) -> np.ndarray:
+    image = np.asarray(image, dtype=np.float32)
+    y_coords = np.asarray(y_coords, dtype=np.float32)
+    x_coords = np.asarray(x_coords, dtype=np.float32)
+
+    h, w = image.shape
+    y0 = np.floor(y_coords).astype(np.int32)
+    x0 = np.floor(x_coords).astype(np.int32)
+    y1 = y0 + 1
+    x1 = x0 + 1
+
+    valid = (y0 >= 0) & (x0 >= 0) & (y1 < h) & (x1 < w)
+    sampled = np.full(y_coords.shape, float(fill_value), dtype=np.float32)
+    if not np.any(valid):
+        return sampled
+
+    y0v = y0[valid]
+    x0v = x0[valid]
+    y1v = y1[valid]
+    x1v = x1[valid]
+    wy = y_coords[valid] - y0v.astype(np.float32)
+    wx = x_coords[valid] - x0v.astype(np.float32)
+
+    top_left = image[y0v, x0v]
+    top_right = image[y0v, x1v]
+    bottom_left = image[y1v, x0v]
+    bottom_right = image[y1v, x1v]
+
+    sampled_valid = (
+        (1.0 - wy) * (1.0 - wx) * top_left
+        + (1.0 - wy) * wx * top_right
+        + wy * (1.0 - wx) * bottom_left
+        + wy * wx * bottom_right
+    )
+    sampled[valid] = sampled_valid.astype(np.float32)
+    return sampled
+
+
+def estimate_centerline_from_mask(mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    mask = np.asarray(mask, dtype=bool)
+    center_x = np.full(mask.shape[0], np.nan, dtype=np.float32)
+    width_values = np.full(mask.shape[0], np.nan, dtype=np.float32)
+
+    for row_idx in range(mask.shape[0]):
+        fg_cols = np.where(mask[row_idx])[0]
+        if fg_cols.size == 0:
+            continue
+        center_x[row_idx] = float(fg_cols.mean())
+        width_values[row_idx] = float(fg_cols.size)
+
+    center_x, valid_fraction = interpolate_missing_1d(center_x, fill_value=float(mask.shape[1] / 2.0))
+    width_values, _ = interpolate_missing_1d(width_values, fill_value=0.0)
+    center_x = moving_average_1d(center_x, kernel_size=7)
+    width_values = moving_average_1d(width_values, kernel_size=7)
+    return center_x.astype(np.float32), width_values.astype(np.float32)
+
+
+def build_centerline_band_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    band_width: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    center_x, width_values = estimate_centerline_from_mask(mask)
+    row_indices = np.arange(mask.shape[0], dtype=np.float32)
+    tangent = np.gradient(center_x.astype(np.float32))
+    normal_x = np.ones_like(tangent, dtype=np.float32)
+    normal_y = -tangent.astype(np.float32)
+    norm = np.sqrt(normal_x ** 2 + normal_y ** 2)
+    normal_x = normal_x / np.maximum(norm, 1e-6)
+    normal_y = normal_y / np.maximum(norm, 1e-6)
+
+    half_extent = np.maximum(width_values * 0.6, 3.0)
+    offsets = np.linspace(-1.0, 1.0, num=band_width, dtype=np.float32)
+
+    band_rows = []
+    row_values = []
+    valid_ratios = []
+    mask_float = mask.astype(np.float32)
+    default_fill = float(np.nanmean(gray_image)) if gray_image.size > 0 else 1.0
+    if not np.isfinite(default_fill):
+        default_fill = 1.0
+
+    for idx in range(mask.shape[0]):
+        sample_x = center_x[idx] + offsets * half_extent[idx] * normal_x[idx]
+        sample_y = row_indices[idx] + offsets * half_extent[idx] * normal_y[idx]
+        sampled_pixels = bilinear_sample(gray_image, sample_y, sample_x, fill_value=default_fill)
+        sampled_mask = bilinear_sample(mask_float, sample_y, sample_x, fill_value=0.0)
+        valid_mask = sampled_mask > 0.5
+
+        if valid_mask.any():
+            valid_pixels = sampled_pixels[valid_mask]
+            row_values.append(float(np.median(valid_pixels)))
+            valid_ratios.append(float(valid_mask.mean()))
+        else:
+            valid_pixels = sampled_pixels
+            row_values.append(float(np.median(valid_pixels)))
+            valid_ratios.append(0.0)
+
+        band_rows.append(sampled_pixels.astype(np.float32))
+
+    band_image = np.stack(band_rows, axis=0).astype(np.float32)
+    row_values = np.asarray(row_values, dtype=np.float32)
+    valid_ratios = np.asarray(valid_ratios, dtype=np.float32)
+    valid_fraction = float(valid_ratios.mean()) if valid_ratios.size > 0 else 0.0
+    return band_image, row_values, width_values, valid_fraction
+
+
+def _extract_band_profile_v1(
     gray_image: np.ndarray,
     mask: np.ndarray,
     profile_length: int = 128,
@@ -264,6 +381,116 @@ def extract_band_profile(
         bbox_width=int(aligned_mask.shape[1]),
         valid_profile_fraction=float(valid_fraction),
     )
+
+
+def _extract_band_profile_v2(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    profile_length: int = 128,
+    band_width: int = 32,
+) -> ChromosomeBandRepresentation:
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(mask)
+    cropped_image = gray_image[y0:y1, x0:x1]
+    cropped_mask = mask[y0:y1, x0:x1]
+
+    angle_deg = estimate_major_axis_angle(cropped_mask)
+    rotated_image, rotated_mask = rotate_image_and_mask(cropped_image, cropped_mask, angle_deg)
+    if rotated_mask.sum() == 0:
+        rotated_mask = np.ones_like(rotated_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(rotated_mask)
+    aligned_image = rotated_image[y0:y1, x0:x1]
+    aligned_mask = rotated_mask[y0:y1, x0:x1]
+    if aligned_image.size == 0:
+        aligned_image = gray_image.copy()
+        aligned_mask = np.ones_like(gray_image, dtype=bool)
+
+    band_image_raw, row_values, width_values, valid_fraction = build_centerline_band_image(
+        gray_image=aligned_image,
+        mask=aligned_mask,
+        band_width=band_width,
+    )
+
+    profile = resample_1d(row_values, profile_length)
+    width_profile = resample_1d(width_values, profile_length)
+    band_image = np.stack(
+        [resample_1d(band_image_raw[:, col_idx], profile_length) for col_idx in range(band_image_raw.shape[1])],
+        axis=1,
+    ).astype(np.float32)
+
+    profile = moving_average_1d(profile, kernel_size=5)
+    width_profile = moving_average_1d(width_profile, kernel_size=5)
+    if band_image.shape[0] >= 5:
+        smoothed = [moving_average_1d(band_image[:, col_idx], kernel_size=5) for col_idx in range(band_image.shape[1])]
+        band_image = np.stack(smoothed, axis=1).astype(np.float32)
+
+    profile = (profile - profile.mean()) / max(float(profile.std()), 1e-6)
+    if width_profile.std() > 1e-6:
+        width_profile = (width_profile - width_profile.mean()) / max(float(width_profile.std()), 1e-6)
+    band_image = (band_image - band_image.mean()) / max(float(band_image.std()), 1e-6)
+
+    return ChromosomeBandRepresentation(
+        profile=profile.astype(np.float32),
+        width_profile=width_profile.astype(np.float32),
+        band_image=band_image.astype(np.float32),
+        major_axis_angle_deg=float(angle_deg),
+        foreground_area=int(aligned_mask.sum()),
+        bbox_height=int(aligned_mask.shape[0]),
+        bbox_width=int(aligned_mask.shape[1]),
+        valid_profile_fraction=float(valid_fraction),
+    )
+
+
+def extract_band_profile(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    profile_length: int = 128,
+    band_width: int = 32,
+    version: str = "v1",
+) -> ChromosomeBandRepresentation:
+    if version == "v1":
+        return _extract_band_profile_v1(
+            gray_image=gray_image,
+            mask=mask,
+            profile_length=profile_length,
+            band_width=band_width,
+        )
+    if version == "v2":
+        return _extract_band_profile_v2(
+            gray_image=gray_image,
+            mask=mask,
+            profile_length=profile_length,
+            band_width=band_width,
+        )
+    raise ValueError(f"Unsupported band representation version: {version}")
+
+
+def flip_band_representation(repr_obj: ChromosomeBandRepresentation) -> ChromosomeBandRepresentation:
+    return ChromosomeBandRepresentation(
+        profile=repr_obj.profile[::-1].copy(),
+        width_profile=repr_obj.width_profile[::-1].copy(),
+        band_image=repr_obj.band_image[::-1].copy(),
+        major_axis_angle_deg=float(repr_obj.major_axis_angle_deg),
+        foreground_area=int(repr_obj.foreground_area),
+        bbox_height=int(repr_obj.bbox_height),
+        bbox_width=int(repr_obj.bbox_width),
+        valid_profile_fraction=float(repr_obj.valid_profile_fraction),
+    )
+
+
+def align_pair_orientation(
+    left_repr: ChromosomeBandRepresentation,
+    right_repr: ChromosomeBandRepresentation,
+) -> ChromosomeBandRepresentation:
+    direct_corr = safe_corrcoef(left_repr.width_profile, right_repr.width_profile)
+    flipped_right = flip_band_representation(right_repr)
+    reverse_corr = safe_corrcoef(left_repr.width_profile, flipped_right.width_profile)
+    if reverse_corr > direct_corr:
+        return flipped_right
+    return right_repr
 
 
 def build_haar_kernel(size: int, weights: Sequence[float]) -> np.ndarray:
@@ -452,6 +679,8 @@ def extract_pair_features_from_paths(
     profile_length: int = 128,
     band_width: int = 32,
     kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
+    representation_version: str = "v1",
+    pair_orientation_align: bool = False,
 ) -> Dict[str, float]:
     left_gray = load_grayscale_image(left_path)
     right_gray = load_grayscale_image(right_path)
@@ -464,13 +693,17 @@ def extract_pair_features_from_paths(
         mask=left_mask,
         profile_length=profile_length,
         band_width=band_width,
+        version=representation_version,
     )
     right_repr = extract_band_profile(
         gray_image=right_gray,
         mask=right_mask,
         profile_length=profile_length,
         band_width=band_width,
+        version=representation_version,
     )
+    if pair_orientation_align:
+        right_repr = align_pair_orientation(left_repr, right_repr)
 
     return extract_pair_haar_features(
         left_repr=left_repr,

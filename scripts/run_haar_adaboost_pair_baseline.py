@@ -50,7 +50,15 @@ def build_adaboost_classifier(n_estimators, learning_rate, max_depth, seed):
         )
 
 
-def build_feature_dataframe(df, profile_length, band_width, kernel_sizes, split_name):
+def build_feature_dataframe(
+    df,
+    profile_length,
+    band_width,
+    kernel_sizes,
+    split_name,
+    representation_version,
+    pair_orientation_align,
+):
     rows = []
     for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Extract-{split_name}", leave=False):
         feature_row = extract_pair_features_from_paths(
@@ -59,6 +67,8 @@ def build_feature_dataframe(df, profile_length, band_width, kernel_sizes, split_
             profile_length=profile_length,
             band_width=band_width,
             kernel_sizes=kernel_sizes,
+            representation_version=representation_version,
+            pair_orientation_align=pair_orientation_align,
         )
         feature_row["label"] = int(row["label"])
         feature_row["chromosome_id"] = str(row["chromosome_id"])
@@ -173,6 +183,8 @@ def main():
     parser.add_argument("--profile_length", type=int, default=128)
     parser.add_argument("--band_width", type=int, default=32)
     parser.add_argument("--kernel_sizes", default="4,8,16,32,64")
+    parser.add_argument("--representation_version", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--pair_orientation_align", action="store_true")
     parser.add_argument("--n_estimators", type=int, default=200)
     parser.add_argument("--learning_rate", type=float, default=0.5)
     parser.add_argument("--max_depth", type=int, default=1)
@@ -200,6 +212,8 @@ def main():
         band_width=args.band_width,
         kernel_sizes=kernel_sizes,
         split_name="train",
+        representation_version=args.representation_version,
+        pair_orientation_align=args.pair_orientation_align,
     )
     val_features_df = build_feature_dataframe(
         val_df,
@@ -207,6 +221,8 @@ def main():
         band_width=args.band_width,
         kernel_sizes=kernel_sizes,
         split_name="val",
+        representation_version=args.representation_version,
+        pair_orientation_align=args.pair_orientation_align,
     )
     test_features_df = build_feature_dataframe(
         test_df,
@@ -214,6 +230,8 @@ def main():
         band_width=args.band_width,
         kernel_sizes=kernel_sizes,
         split_name="test",
+        representation_version=args.representation_version,
+        pair_orientation_align=args.pair_orientation_align,
     )
 
     feature_columns = get_feature_columns(train_features_df)
@@ -279,6 +297,8 @@ def main():
         f"- profile_length: `{args.profile_length}`",
         f"- band_width: `{args.band_width}`",
         f"- kernel_sizes: `{kernel_sizes}`",
+        f"- representation_version: `{args.representation_version}`",
+        f"- pair_orientation_align: `{args.pair_orientation_align}`",
         f"- n_estimators: `{args.n_estimators}`",
         f"- learning_rate: `{args.learning_rate}`",
         f"- weak_learner_max_depth: `{args.max_depth}`",
@@ -306,6 +326,8 @@ def main():
             "profile_length": int(args.profile_length),
             "band_width": int(args.band_width),
             "kernel_sizes": kernel_sizes,
+            "representation_version": args.representation_version,
+            "pair_orientation_align": bool(args.pair_orientation_align),
             "num_feature_columns": int(len(feature_columns)),
         },
         "model_settings": {
