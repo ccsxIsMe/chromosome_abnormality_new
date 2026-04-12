@@ -78,7 +78,9 @@ class BandConvPairClassifier(nn.Module):
             nn.Dropout(dropout),
         )
 
-        fusion_dim = (128 * 3) + (96 * 3) + 7
+        # direct / reverse / delta are all concatenated explicitly, so the final
+        # fusion width is much larger than a single pairwise block.
+        fusion_dim = (128 * 9) + (96 * 9) + 7
         self.embedding_head = nn.Sequential(
             nn.Linear(fusion_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
