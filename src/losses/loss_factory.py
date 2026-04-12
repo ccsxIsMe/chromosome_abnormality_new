@@ -53,6 +53,30 @@ def extract_structure_logits(model_output):
     return None
 
 
+def extract_pair_consistency_direct(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("pair_consistency_direct")
+    return None
+
+
+def extract_pair_consistency_reverse(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("pair_consistency_reverse")
+    return None
+
+
+def extract_profile_consistency_direct(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("profile_consistency_direct")
+    return None
+
+
+def extract_profile_consistency_reverse(model_output):
+    if isinstance(model_output, dict):
+        return model_output.get("profile_consistency_reverse")
+    return None
+
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=None, gamma=2.0, reduction="mean"):
         super().__init__()
@@ -522,6 +546,10 @@ class MultiPrototypeMetricLoss(nn.Module):
         diversity_margin=0.2,
         normal_chr_contrastive_weight=0.0,
         normal_chr_contrastive_temperature=0.07,
+        normal_pair_consistency_weight=0.0,
+        normal_pair_consistency_margin=0.05,
+        profile_pair_consistency_weight=0.0,
+        profile_pair_consistency_margin=0.02,
         structure_weight=0.0,
         pericentric_weight=1.0,
         arm_weight=1.0,
@@ -541,6 +569,10 @@ class MultiPrototypeMetricLoss(nn.Module):
             temperature=normal_chr_contrastive_temperature,
             eps=eps,
         )
+        self.normal_pair_consistency_weight = normal_pair_consistency_weight
+        self.normal_pair_consistency_margin = normal_pair_consistency_margin
+        self.profile_pair_consistency_weight = profile_pair_consistency_weight
+        self.profile_pair_consistency_margin = profile_pair_consistency_margin
         self.structure_weight = structure_weight
         self.pericentric_weight = pericentric_weight
         self.arm_weight = arm_weight
@@ -612,6 +644,26 @@ class MultiPrototypeMetricLoss(nn.Module):
                 if normal_embeddings.size(0) >= 2:
                     contrastive_term = self.normal_chr_contrastive(normal_embeddings, normal_chr_idx)
                     total_loss = total_loss + self.normal_chr_contrastive_weight * contrastive_term
+
+        if self.normal_pair_consistency_weight > 0 and normal_mask.any():
+            direct_similarity = extract_pair_consistency_direct(model_output)
+            reverse_similarity = extract_pair_consistency_reverse(model_output)
+            if direct_similarity is not None and reverse_similarity is not None:
+                consistency_term = F.relu(
+                    self.normal_pair_consistency_margin
+                    - (direct_similarity[normal_mask] - reverse_similarity[normal_mask])
+                ).mean()
+                total_loss = total_loss + self.normal_pair_consistency_weight * consistency_term
+
+        if self.profile_pair_consistency_weight > 0 and normal_mask.any():
+            profile_direct_similarity = extract_profile_consistency_direct(model_output)
+            profile_reverse_similarity = extract_profile_consistency_reverse(model_output)
+            if profile_direct_similarity is not None and profile_reverse_similarity is not None:
+                profile_consistency_term = F.relu(
+                    self.profile_pair_consistency_margin
+                    - (profile_direct_similarity[normal_mask] - profile_reverse_similarity[normal_mask])
+                ).mean()
+                total_loss = total_loss + self.profile_pair_consistency_weight * profile_consistency_term
 
         if self.structure_weight > 0 and batch is not None:
             structure_logits = extract_structure_logits(model_output)
@@ -714,6 +766,10 @@ def build_loss(loss_cfg, device, experiment_mode="classifier", model=None):
             diversity_margin=metric_cfg.get("diversity_margin", 0.2),
             normal_chr_contrastive_weight=metric_cfg.get("normal_chr_contrastive_weight", 0.0),
             normal_chr_contrastive_temperature=metric_cfg.get("normal_chr_contrastive_temperature", 0.07),
+            normal_pair_consistency_weight=metric_cfg.get("normal_pair_consistency_weight", 0.0),
+            normal_pair_consistency_margin=metric_cfg.get("normal_pair_consistency_margin", 0.05),
+            profile_pair_consistency_weight=metric_cfg.get("profile_pair_consistency_weight", 0.0),
+            profile_pair_consistency_margin=metric_cfg.get("profile_pair_consistency_margin", 0.02),
             structure_weight=metric_cfg.get("structure_weight", 0.0),
             pericentric_weight=metric_cfg.get("pericentric_weight", 1.0),
             arm_weight=metric_cfg.get("arm_weight", 1.0),

@@ -6,15 +6,15 @@ from src.models.local_pair_comparator import ResNetFeatureExtractor
 from src.utils.inversion_attributes import get_structure_label_dims
 
 
-class CorrespondenceIntervalPairClassifier(nn.Module):
+class CorrespondenceIntervalProfilePairClassifier(nn.Module):
     """
-    Difference-first pair model for inversion detection.
+    P12-style pair model with an explicit 1D band-profile branch.
 
-    Main ideas:
-    - model pair comparison as dense correspondence between ordered chromosome tokens
-    - compare direct correspondence against reversed correspondence
-    - aggregate interval evidence from correlation maps
-    - jointly predict structural attributes for abnormal pairs
+    The extra branch keeps the current correspondence-interval backbone but adds
+    a more task-aligned inductive bias:
+    - collapse width to an ordered long-axis profile
+    - compare direct vs reversed homolog profiles
+    - aggregate multi-scale 1D evidence before the final embedding head
     """
 
     def __init__(
@@ -30,6 +30,8 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
         use_chromosome_id=False,
         num_chromosome_types=None,
         chr_embed_dim=16,
+        profile_hidden_dim=48,
+        profile_kernel_sizes=(3, 5, 9),
     ):
         super().__init__()
 
@@ -80,6 +82,37 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
         )
         self.corr_pool = nn.AdaptiveAvgPool2d((1, 1))
 
+        profile_in_channels = proj_dim * 6
+        self.profile_reduce = nn.Sequential(
+            nn.Conv1d(profile_in_channels, profile_hidden_dim, kernel_size=1, bias=False),
+            nn.BatchNorm1d(profile_hidden_dim),
+            nn.GELU(),
+        )
+        self.profile_multiscale = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv1d(
+                        profile_hidden_dim,
+                        profile_hidden_dim,
+                        kernel_size=kernel_size,
+                        padding=kernel_size // 2,
+                        bias=False,
+                    ),
+                    nn.BatchNorm1d(profile_hidden_dim),
+                    nn.GELU(),
+                )
+                for kernel_size in profile_kernel_sizes
+            ]
+        )
+        profile_out_channels = profile_hidden_dim * len(profile_kernel_sizes)
+        self.profile_attention = nn.Sequential(
+            nn.Conv1d(profile_out_channels, profile_hidden_dim, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm1d(profile_hidden_dim),
+            nn.GELU(),
+            nn.Conv1d(profile_hidden_dim, 1, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
         if self.use_chromosome_id:
             if num_chromosome_types is None:
                 raise ValueError("num_chromosome_types must be provided when use_chromosome_id=True")
@@ -87,7 +120,8 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
         else:
             chr_embed_dim = 0
 
-        fusion_dim = proj_dim * 4 + 7 + chr_embed_dim
+        profile_stat_dim = 5
+        fusion_dim = proj_dim * 4 + 7 + (profile_out_channels * 2) + profile_stat_dim + chr_embed_dim
         self.embedding_head = nn.Sequential(
             nn.Linear(fusion_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
@@ -111,6 +145,60 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
     def _to_sequence(self, feat_map):
         seq = feat_map.mean(dim=3).transpose(1, 2)
         return self.sequence_encoder(seq)
+
+    def _build_profile_features(self, left_feat, right_feat):
+        left_profile = left_feat.mean(dim=3)
+        right_profile = right_feat.mean(dim=3)
+        right_profile_rev = torch.flip(right_profile, dims=[2])
+
+        direct_diff = torch.abs(left_profile - right_profile)
+        reverse_diff = torch.abs(left_profile - right_profile_rev)
+        reverse_advantage = F.relu(direct_diff - reverse_diff)
+
+        profile_stack = torch.cat(
+            [
+                left_profile,
+                right_profile,
+                right_profile_rev,
+                direct_diff,
+                reverse_diff,
+                reverse_advantage,
+            ],
+            dim=1,
+        )
+        profile_base = self.profile_reduce(profile_stack)
+        profile_multiscale_feat = torch.cat([branch(profile_base) for branch in self.profile_multiscale], dim=1)
+        profile_attn = self.profile_attention(profile_multiscale_feat)
+        profile_weighted = profile_multiscale_feat * profile_attn
+        profile_avg = profile_weighted.mean(dim=2)
+        profile_max = profile_weighted.amax(dim=2)
+        profile_vec = torch.cat([profile_avg, profile_max], dim=1)
+
+        direct_l1 = direct_diff.mean(dim=(1, 2))
+        reverse_l1 = reverse_diff.mean(dim=(1, 2))
+        direct_profile_similarity = F.cosine_similarity(left_profile.flatten(1), right_profile.flatten(1), dim=1)
+        reverse_profile_similarity = F.cosine_similarity(left_profile.flatten(1), right_profile_rev.flatten(1), dim=1)
+        reverse_profile_gain = F.relu(reverse_profile_similarity - direct_profile_similarity)
+
+        profile_stats = torch.stack(
+            [
+                direct_l1,
+                reverse_l1,
+                F.relu(direct_l1 - reverse_l1),
+                direct_profile_similarity,
+                reverse_profile_similarity,
+            ],
+            dim=1,
+        )
+
+        return {
+            "profile_vec": profile_vec,
+            "profile_stats": profile_stats,
+            "profile_attention": profile_attn,
+            "direct_profile_similarity": direct_profile_similarity,
+            "reverse_profile_similarity": reverse_profile_similarity,
+            "reverse_profile_gain": reverse_profile_gain,
+        }
 
     def forward(self, left_image, right_image, chr_idx=None):
         left_feat = self.feature_proj(self.encoder(left_image))
@@ -149,6 +237,8 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
         token_feat = self.token_fusion(token_feat)
         token_vec = token_feat.mean(dim=1)
 
+        profile_output = self._build_profile_features(left_feat, right_feat)
+
         fused = [
             global_diff,
             corr_vec,
@@ -166,6 +256,8 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
                 ],
                 dim=1,
             ),
+            profile_output["profile_vec"],
+            profile_output["profile_stats"],
         ]
 
         if self.use_chromosome_id:
@@ -194,4 +286,10 @@ class CorrespondenceIntervalPairClassifier(nn.Module):
             "pair_consistency_reverse": reverse_diag_mean,
             "reverse_gain": reverse_gain,
             "interval_attention": interval_attn,
+            "profile_attention": profile_output["profile_attention"],
+            "direct_profile_similarity": profile_output["direct_profile_similarity"],
+            "reverse_profile_similarity": profile_output["reverse_profile_similarity"],
+            "profile_consistency_direct": profile_output["direct_profile_similarity"],
+            "profile_consistency_reverse": profile_output["reverse_profile_similarity"],
+            "reverse_profile_gain": profile_output["reverse_profile_gain"],
         }
