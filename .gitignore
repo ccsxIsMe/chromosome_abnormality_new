@@ -18,3 +18,4 @@ saved_model/
 *.xz
 *.run
 outputs/experiments/**/*.csv
+outputs/experiments/**/*.npz
