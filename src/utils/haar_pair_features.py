@@ -710,3 +710,42 @@ def extract_pair_features_from_paths(
         right_repr=right_repr,
         kernel_sizes=kernel_sizes,
     )
+
+
+def extract_single_band_representation_from_path(
+    image_path: str,
+    profile_length: int = 128,
+    band_width: int = 32,
+    representation_version: str = "v1",
+) -> ChromosomeBandRepresentation:
+    gray_image = load_grayscale_image(image_path)
+    mask = estimate_foreground_mask(gray_image)
+    return extract_band_profile(
+        gray_image=gray_image,
+        mask=mask,
+        profile_length=profile_length,
+        band_width=band_width,
+        version=representation_version,
+    )
+
+
+def extract_pair_band_representations_from_paths(
+    left_path: str,
+    right_path: str,
+    profile_length: int = 128,
+    band_width: int = 32,
+    representation_version: str = "v1",
+) -> Tuple[ChromosomeBandRepresentation, ChromosomeBandRepresentation]:
+    left_repr = extract_single_band_representation_from_path(
+        image_path=left_path,
+        profile_length=profile_length,
+        band_width=band_width,
+        representation_version=representation_version,
+    )
+    right_repr = extract_single_band_representation_from_path(
+        image_path=right_path,
+        profile_length=profile_length,
+        band_width=band_width,
+        representation_version=representation_version,
+    )
+    return left_repr, right_repr
