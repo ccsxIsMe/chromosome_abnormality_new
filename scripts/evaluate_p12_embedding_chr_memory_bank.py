@@ -80,6 +80,17 @@ def _normalize_batch_meta(batch, metadata_keys, batch_size):
     return normalized
 
 
+def _build_row_uid(row):
+    parts = [
+        str(row.get("case_id", "")),
+        str(row.get("pair_key", "")),
+        str(row.get("left_path", "")),
+        str(row.get("right_path", "")),
+        str(row.get("chromosome_id", "")),
+    ]
+    return "||".join(parts)
+
+
 @torch.no_grad()
 def collect_embeddings(model, loader, device, use_chromosome_id=False, use_pair_input=False):
     model.eval()
@@ -127,6 +138,7 @@ def collect_embeddings(model, loader, device, use_chromosome_id=False, use_pair_
             }
             for key, values in normalized_meta.items():
                 row[key] = values[idx]
+            row["row_uid"] = _build_row_uid(row)
             rows.append(row)
 
     return rows
@@ -147,16 +159,21 @@ def build_chr_memory_bank(rows, normalize_embeddings=True, max_per_chr=None, see
         if int(row["label"]) != 0:
             continue
         chromosome_id = str(row["chromosome_id"])
-        grouped.setdefault(chromosome_id, []).append(row["embedding"])
+        grouped.setdefault(chromosome_id, []).append(row)
 
     memory_bank = {}
-    for chromosome_id, emb_list in grouped.items():
-        emb = np.stack(emb_list, axis=0).astype(np.float32)
+    for chromosome_id, bank_rows in grouped.items():
+        emb = np.stack([row["embedding"] for row in bank_rows], axis=0).astype(np.float32)
+        row_uids = np.asarray([str(row.get("row_uid", "")) for row in bank_rows], dtype=object)
         emb = maybe_normalize_embeddings(emb, normalize_embeddings)
         if max_per_chr is not None and emb.shape[0] > int(max_per_chr):
-            indices = rng.choice(emb.shape[0], size=int(max_per_chr), replace=False)
+            indices = np.sort(rng.choice(emb.shape[0], size=int(max_per_chr), replace=False))
             emb = emb[indices]
-        memory_bank[chromosome_id] = emb
+            row_uids = row_uids[indices]
+        memory_bank[chromosome_id] = {
+            "embeddings": emb,
+            "row_uids": row_uids,
+        }
 
     if not memory_bank:
         raise ValueError("Memory bank is empty. Expected normal training samples.")
@@ -177,22 +194,54 @@ def compute_knn_distance(query_embedding, bank_embeddings, distance="cosine", kn
     return float(nearest.mean())
 
 
-def score_rows_with_memory_bank(rows, memory_bank, normalize_embeddings=True, distance="cosine", knn_k=1):
+def score_rows_with_memory_bank(
+    rows,
+    memory_bank,
+    normalize_embeddings=True,
+    distance="cosine",
+    knn_k=1,
+    leave_one_out=False,
+):
     scored_rows = []
 
-    all_bank_embeddings = np.concatenate(list(memory_bank.values()), axis=0)
+    all_bank_embeddings = np.concatenate(
+        [bank_entry["embeddings"] for bank_entry in memory_bank.values()],
+        axis=0,
+    )
+    all_bank_row_uids = np.concatenate(
+        [bank_entry["row_uids"] for bank_entry in memory_bank.values()],
+        axis=0,
+    )
+
     for row in rows:
         chromosome_id = str(row["chromosome_id"])
-        bank = memory_bank.get(chromosome_id, all_bank_embeddings)
+        bank_entry = memory_bank.get(chromosome_id)
+        if bank_entry is None:
+            bank_embeddings = all_bank_embeddings
+            bank_row_uids = all_bank_row_uids
+        else:
+            bank_embeddings = bank_entry["embeddings"]
+            bank_row_uids = bank_entry["row_uids"]
 
         query = np.asarray(row["embedding"], dtype=np.float32)
         if normalize_embeddings:
             denom = max(float(np.linalg.norm(query)), 1e-12)
             query = query / denom
 
+        if leave_one_out:
+            row_uid = str(row.get("row_uid", ""))
+            keep_mask = bank_row_uids != row_uid
+            if not np.any(keep_mask):
+                keep_mask = all_bank_row_uids != row_uid
+                filtered_bank = all_bank_embeddings[keep_mask]
+            else:
+                filtered_bank = bank_embeddings[keep_mask]
+            if filtered_bank.shape[0] > 0:
+                bank_embeddings = filtered_bank
+
         memory_score = compute_knn_distance(
             query_embedding=query,
-            bank_embeddings=bank,
+            bank_embeddings=bank_embeddings,
             distance=distance,
             knn_k=knn_k,
         )
@@ -354,6 +403,8 @@ def main():
     parser.add_argument("--no_normalize_embeddings", action="store_false", dest="normalize_embeddings")
     parser.add_argument("--max_train_per_chr", type=int, default=0)
     parser.add_argument("--quantiles", default="0.95,0.975,0.99")
+    parser.add_argument("--train_leave_one_out", action="store_true", default=True)
+    parser.add_argument("--no_train_leave_one_out", action="store_false", dest="train_leave_one_out")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -406,6 +457,7 @@ def main():
         normalize_embeddings=args.normalize_embeddings,
         distance=args.distance,
         knn_k=args.knn_k,
+        leave_one_out=args.train_leave_one_out,
     )
     val_rows = score_rows_with_memory_bank(
         val_rows,
@@ -413,6 +465,7 @@ def main():
         normalize_embeddings=args.normalize_embeddings,
         distance=args.distance,
         knn_k=args.knn_k,
+        leave_one_out=False,
     )
     test_rows = score_rows_with_memory_bank(
         test_rows,
@@ -420,6 +473,7 @@ def main():
         normalize_embeddings=args.normalize_embeddings,
         distance=args.distance,
         knn_k=args.knn_k,
+        leave_one_out=False,
     )
 
     train_df = records_to_dataframe(train_rows, score_column="memory_bank_score")
@@ -535,10 +589,14 @@ def main():
         "distance": args.distance,
         "knn_k": int(args.knn_k),
         "normalize_embeddings": bool(args.normalize_embeddings),
+        "train_leave_one_out": bool(args.train_leave_one_out),
         "quantiles": quantiles,
         "max_train_per_chr": None if int(args.max_train_per_chr) <= 0 else int(args.max_train_per_chr),
-        "memory_bank_sizes": {chromosome_id: int(bank.shape[0]) for chromosome_id, bank in memory_bank.items()},
-        "embedding_dim": int(next(iter(memory_bank.values())).shape[1]),
+        "memory_bank_sizes": {
+            chromosome_id: int(bank_entry["embeddings"].shape[0])
+            for chromosome_id, bank_entry in memory_bank.items()
+        },
+        "embedding_dim": int(next(iter(memory_bank.values()))["embeddings"].shape[1]),
         "global_eval": {
             "val_best_threshold": float(best_threshold),
             "val_best_score": float(best_score),
