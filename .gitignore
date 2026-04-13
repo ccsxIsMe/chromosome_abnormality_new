@@ -17,6 +17,7 @@ saved_model/
 *.tar.gz
 *.xz
 *.run
+*.png
 outputs/experiments/**/*.csv
 outputs/experiments/**/*.npz
 
