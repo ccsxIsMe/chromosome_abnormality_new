@@ -20,7 +20,22 @@ def parse_args():
     parser.add_argument("--output_report_dir", required=True)
     parser.add_argument("--output_height", type=int, default=300)
     parser.add_argument("--output_width", type=int, default=96)
+    parser.add_argument(
+        "--canvas_size",
+        type=int,
+        default=300,
+        help="If > 0, paste the straightened image onto a white square canvas of this size to avoid later resize distortion.",
+    )
     parser.add_argument("--smooth_kernel_size", type=int, default=5)
+    parser.add_argument(
+        "--straightening_method",
+        default="projection_split_v1",
+        choices=["centerline_unfold", "projection_split_v1"],
+        help="Straightening strategy. projection_split_v1 follows the bend-point split-and-rotate idea.",
+    )
+    parser.add_argument("--global_angle_step", type=int, default=5)
+    parser.add_argument("--local_angle_step", type=int, default=5)
+    parser.add_argument("--seam_trim", type=int, default=3)
     parser.add_argument(
         "--save_mask_preview",
         action="store_true",
@@ -44,6 +59,25 @@ def save_grayscale_image(image_array: np.ndarray, save_path: Path):
     Image.fromarray(image_uint8, mode="L").save(save_path)
 
 
+def paste_on_square_canvas(image_array: np.ndarray, canvas_size: int, fill_value: float) -> np.ndarray:
+    image_array = np.asarray(image_array, dtype=np.float32)
+    if int(canvas_size) <= 0:
+        return image_array.astype(np.float32)
+
+    h, w = image_array.shape
+    if h > int(canvas_size) or w > int(canvas_size):
+        raise ValueError(
+            f"Image shape {image_array.shape} is larger than canvas_size={canvas_size}. "
+            "Increase canvas_size or reduce output_height/output_width."
+        )
+
+    canvas = np.full((int(canvas_size), int(canvas_size)), float(fill_value), dtype=np.float32)
+    top = (int(canvas_size) - h) // 2
+    left = (int(canvas_size) - w) // 2
+    canvas[top : top + h, left : left + w] = image_array
+    return canvas.astype(np.float32)
+
+
 def build_unique_path_table(train_df, val_df, test_df):
     all_paths = []
     for df in (train_df, val_df, test_df):
@@ -53,7 +87,19 @@ def build_unique_path_table(train_df, val_df, test_df):
     return pd.DataFrame({"source_path": unique_paths})
 
 
-def process_unique_images(unique_path_df, output_image_dir: Path, output_height, output_width, smooth_kernel_size, save_mask_preview):
+def process_unique_images(
+    unique_path_df,
+    output_image_dir: Path,
+    output_height,
+    output_width,
+    canvas_size,
+    smooth_kernel_size,
+    save_mask_preview,
+    straightening_method,
+    global_angle_step,
+    local_angle_step,
+    seam_trim,
+):
     rows = []
     path_map = {}
 
@@ -64,14 +110,28 @@ def process_unique_images(unique_path_df, output_image_dir: Path, output_height,
             output_height=output_height,
             output_width=output_width,
             smooth_kernel_size=smooth_kernel_size,
+            method=straightening_method,
+            global_angle_step=global_angle_step,
+            local_angle_step=local_angle_step,
+            seam_trim=seam_trim,
+        )
+        straightened_image = paste_on_square_canvas(
+            straightened.image,
+            canvas_size=canvas_size,
+            fill_value=1.0,
+        )
+        straightened_mask = paste_on_square_canvas(
+            straightened.mask,
+            canvas_size=canvas_size,
+            fill_value=0.0,
         )
 
         rel_path = safe_rel_image_path(source_path)
         save_path = output_image_dir / rel_path
-        save_grayscale_image(straightened.image, save_path)
+        save_grayscale_image(straightened_image, save_path)
         if save_mask_preview:
             mask_path = save_path.with_name(save_path.stem + "__mask" + save_path.suffix)
-            save_grayscale_image(straightened.mask, mask_path)
+            save_grayscale_image(straightened_mask, mask_path)
 
         path_map[source_path] = str(save_path)
         rows.append(
@@ -85,6 +145,8 @@ def process_unique_images(unique_path_df, output_image_dir: Path, output_height,
                 "valid_profile_fraction": float(straightened.valid_profile_fraction),
                 "output_height": int(output_height),
                 "output_width": int(output_width),
+                "canvas_size": int(canvas_size),
+                "straightening_method": str(straightening_method),
             }
         )
 
@@ -120,14 +182,19 @@ def write_report(report_dir: Path, args, split_rows, unique_image_count):
         "# Straightened Pair Dataset",
         "",
         "Definition",
-        "- each chromosome image is unfolded into a centerline-aligned straightened grayscale image",
+        "- each chromosome image is transformed into a straightened grayscale image using the selected straightening method",
         "- pair CSV structure is preserved; only `left_path` / `right_path` are rewritten",
         "- this is an additive preprocessing protocol and does not overwrite the source protocol",
         "",
         "Settings",
         f"- output_height: `{args.output_height}`",
         f"- output_width: `{args.output_width}`",
+        f"- canvas_size: `{args.canvas_size}`",
         f"- smooth_kernel_size: `{args.smooth_kernel_size}`",
+        f"- straightening_method: `{args.straightening_method}`",
+        f"- global_angle_step: `{args.global_angle_step}`",
+        f"- local_angle_step: `{args.local_angle_step}`",
+        f"- seam_trim: `{args.seam_trim}`",
         f"- unique_source_images: `{unique_image_count}`",
         "",
         "Split summary",
@@ -161,8 +228,13 @@ def main():
         output_image_dir=output_image_dir,
         output_height=args.output_height,
         output_width=args.output_width,
+        canvas_size=args.canvas_size,
         smooth_kernel_size=args.smooth_kernel_size,
         save_mask_preview=args.save_mask_preview,
+        straightening_method=args.straightening_method,
+        global_angle_step=args.global_angle_step,
+        local_angle_step=args.local_angle_step,
+        seam_trim=args.seam_trim,
     )
 
     train_out = rewrite_pair_csv(train_df, path_map)

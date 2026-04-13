@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
+
+try:
+    import cv2
+except ImportError:  # pragma: no cover - depends on local runtime
+    cv2 = None
 
 
 @dataclass
@@ -306,6 +311,13 @@ def build_centerline_band_image(
     return band_image, row_values, width_values, valid_fraction
 
 
+def _require_cv2(method_name: str):
+    if cv2 is None:
+        raise ImportError(
+            f"{method_name} requires OpenCV (`cv2`) but it is not installed in the current environment."
+        )
+
+
 def resample_2d_height_first(image: np.ndarray, target_height: int) -> np.ndarray:
     image = np.asarray(image, dtype=np.float32)
     if image.ndim != 2:
@@ -344,13 +356,316 @@ def _prepare_aligned_crop(gray_image: np.ndarray, mask: np.ndarray) -> Tuple[np.
     return aligned_image.astype(np.float32), aligned_mask.astype(bool), float(angle_deg)
 
 
+def _resize_gray_image(image: np.ndarray, out_width: int, out_height: int) -> np.ndarray:
+    image = np.asarray(image, dtype=np.float32)
+    if cv2 is not None:
+        resized = cv2.resize(
+            image,
+            (int(out_width), int(out_height)),
+            interpolation=cv2.INTER_LINEAR,
+        )
+        return np.clip(resized, 0.0, 1.0).astype(np.float32)
+
+    pil_image = Image.fromarray(np.clip(image * 255.0, 0.0, 255.0).astype(np.uint8), mode="L")
+    resized = pil_image.resize((int(out_width), int(out_height)), resample=Image.BILINEAR)
+    return (np.asarray(resized, dtype=np.float32) / 255.0).astype(np.float32)
+
+
+def _add_border_gray(gray_image: np.ndarray, value: float = 1.0) -> np.ndarray:
+    h, w = gray_image.shape
+    border = max(h // 2, w // 2)
+    return np.pad(
+        gray_image,
+        ((border, border), (border, border)),
+        mode="constant",
+        constant_values=float(value),
+    ).astype(np.float32)
+
+
+def _binary_mask_uint8(mask: np.ndarray) -> np.ndarray:
+    return (np.asarray(mask, dtype=np.uint8) > 0).astype(np.uint8) * 255
+
+
+def _crop_to_nonzero(image: np.ndarray, mask_uint8: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    ys, xs = np.where(mask_uint8 > 0)
+    if ys.size == 0 or xs.size == 0:
+        return image.astype(np.float32), (mask_uint8 > 0)
+
+    y0 = max(int(ys.min()), 0)
+    y1 = min(int(ys.max()) + 1, image.shape[0])
+    x0 = max(int(xs.min()), 0)
+    x1 = min(int(xs.max()) + 1, image.shape[1])
+    return image[y0:y1, x0:x1].astype(np.float32), (mask_uint8[y0:y1, x0:x1] > 0)
+
+
+def _rotate_gray_and_mask_cv2(gray_image: np.ndarray, mask_uint8: np.ndarray, degree: float) -> Tuple[np.ndarray, np.ndarray]:
+    _require_cv2("_rotate_gray_and_mask_cv2")
+
+    h, w = gray_image.shape
+    center = (w / 2.0, h / 2.0)
+    matrix = cv2.getRotationMatrix2D(center, float(degree), 1.0)
+
+    cos = abs(matrix[0, 0])
+    sin = abs(matrix[0, 1])
+    new_w = int((h * sin) + (w * cos))
+    new_h = int((h * cos) + (w * sin))
+
+    matrix[0, 2] += (new_w / 2.0) - center[0]
+    matrix[1, 2] += (new_h / 2.0) - center[1]
+
+    rotated_gray = cv2.warpAffine(
+        np.clip(gray_image * 255.0, 0.0, 255.0).astype(np.uint8),
+        matrix,
+        (new_w, new_h),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=255,
+    )
+    rotated_mask = cv2.warpAffine(
+        mask_uint8,
+        matrix,
+        (new_w, new_h),
+        flags=cv2.INTER_NEAREST,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    )
+    return rotated_gray.astype(np.float32) / 255.0, rotated_mask.astype(np.uint8)
+
+
+def _find_local_extrema_1d(values: np.ndarray, mode: str) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float32)
+    if values.size < 3:
+        return np.asarray([], dtype=np.int32)
+
+    left = values[1:-1] - values[:-2]
+    right = values[1:-1] - values[2:]
+    if mode == "max":
+        mask = (left >= 0) & (right >= 0) & ((left > 0) | (right > 0))
+    elif mode == "min":
+        mask = (left <= 0) & (right <= 0) & ((left < 0) | (right < 0))
+    else:
+        raise ValueError(f"Unsupported extrema mode: {mode}")
+    return np.where(mask)[0] + 1
+
+
+def _smooth_projection_for_bend(y_projection: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    y_projection = np.asarray(y_projection, dtype=np.float32)
+    if y_projection.size < 4:
+        idx = np.arange(y_projection.size, dtype=np.float32)
+        return idx, y_projection
+
+    src_idx = np.arange(y_projection.size, dtype=np.float32)
+    dst_size = max(int(np.ceil(y_projection.size * 0.5)), 8)
+    dst_idx = np.linspace(0.0, float(y_projection.size - 1), dst_size, dtype=np.float32)
+    inter = np.interp(dst_idx, src_idx, y_projection).astype(np.float32)
+    inter = moving_average_1d(inter, kernel_size=7 if inter.size >= 7 else 3)
+    return dst_idx, inter
+
+
+def _s_score_from_projection(mask_uint8: np.ndarray) -> Tuple[float, Optional[int], Dict[str, np.ndarray]]:
+    y_projection = np.sum(mask_uint8 > 0, axis=1).astype(np.float32)
+    smooth_idx, smooth_projection = _smooth_projection_for_bend(y_projection)
+
+    sag_indices = _find_local_extrema_1d(smooth_projection, mode="min")
+    if sag_indices.size == 0:
+        return float("inf"), None, {}
+
+    sag_idx = int(sag_indices[np.argmin(smooth_projection[sag_indices])])
+    sag_value = float(smooth_projection[sag_idx])
+
+    left_projection = smooth_projection[:sag_idx]
+    right_projection = smooth_projection[sag_idx + 1 :]
+    left_peaks = _find_local_extrema_1d(left_projection, mode="max")
+    right_peaks = _find_local_extrema_1d(right_projection, mode="max")
+    if left_peaks.size == 0 or right_peaks.size == 0:
+        return float("inf"), None, {}
+
+    left_peak = float(left_projection[left_peaks].max())
+    right_peak = float(right_projection[right_peaks].max())
+    denom = max(left_peak + right_peak, 1e-6)
+    r1 = abs(left_peak - right_peak) / denom
+    r2 = sag_value / denom
+    score = 0.5 * r1 + 0.5 * r2
+    bend_row = int(round(float(smooth_idx[sag_idx])))
+    debug = {
+        "y_projection": y_projection,
+        "smooth_idx": smooth_idx,
+        "smooth_projection": smooth_projection,
+    }
+    return float(score), bend_row, debug
+
+
+def _find_best_global_bend_rotation(gray_image: np.ndarray, mask: np.ndarray, angle_step: int = 5) -> Tuple[np.ndarray, np.ndarray, float, Optional[int], float]:
+    _require_cv2("_find_best_global_bend_rotation")
+
+    bordered_gray = _add_border_gray(gray_image, value=1.0)
+    bordered_mask = _add_border_gray(mask.astype(np.float32), value=0.0) > 0.5
+    mask_uint8 = _binary_mask_uint8(bordered_mask)
+
+    best = None
+    for degree in range(0, 180, int(angle_step)):
+        rotated_gray, rotated_mask = _rotate_gray_and_mask_cv2(bordered_gray, mask_uint8, float(degree))
+        cropped_gray, cropped_mask = _crop_to_nonzero(rotated_gray, rotated_mask)
+        cropped_mask_uint8 = _binary_mask_uint8(cropped_mask)
+        score, bend_row, _ = _s_score_from_projection(cropped_mask_uint8)
+        if bend_row is None:
+            continue
+        if best is None or score < best["score"]:
+            best = {
+                "gray": cropped_gray,
+                "mask": cropped_mask,
+                "degree": float(degree),
+                "bend_row": int(bend_row),
+                "score": float(score),
+            }
+
+    if best is None:
+        aligned_gray, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
+        return aligned_gray, aligned_mask, float(angle_deg), None, float("inf")
+
+    return best["gray"], best["mask"], best["degree"], best["bend_row"], best["score"]
+
+
+def _find_min_width_rotation(gray_image: np.ndarray, mask: np.ndarray, angle_step: int = 5) -> Tuple[np.ndarray, np.ndarray, float]:
+    _require_cv2("_find_min_width_rotation")
+
+    if gray_image.size == 0:
+        return gray_image.astype(np.float32), mask.astype(bool), 0.0
+
+    bordered_gray = _add_border_gray(gray_image, value=1.0)
+    bordered_mask = _add_border_gray(mask.astype(np.float32), value=0.0) > 0.5
+    mask_uint8 = _binary_mask_uint8(bordered_mask)
+
+    best = None
+    for degree in range(-90, 90, int(angle_step)):
+        rotated_gray, rotated_mask = _rotate_gray_and_mask_cv2(bordered_gray, mask_uint8, float(degree))
+        cropped_gray, cropped_mask = _crop_to_nonzero(rotated_gray, rotated_mask)
+        projection = np.sum(cropped_mask, axis=0).astype(np.float32)
+        nonzero_cols = np.where(projection > 0)[0]
+        if nonzero_cols.size == 0:
+            continue
+        width = int(nonzero_cols[-1] - nonzero_cols[0] + 1)
+        if best is None or width < best["width"]:
+            best = {
+                "gray": cropped_gray,
+                "mask": cropped_mask,
+                "degree": float(degree),
+                "width": int(width),
+            }
+
+    if best is None:
+        return gray_image.astype(np.float32), mask.astype(bool), 0.0
+    return best["gray"], best["mask"], best["degree"]
+
+
+def _pad_right_to_width(image: np.ndarray, target_width: int, fill_value: float) -> np.ndarray:
+    image = np.asarray(image, dtype=np.float32)
+    if image.shape[1] >= target_width:
+        return image
+    pad_width = int(target_width - image.shape[1])
+    return np.pad(image, ((0, 0), (0, pad_width)), mode="constant", constant_values=float(fill_value)).astype(np.float32)
+
+
+def extract_projection_split_straightened_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    output_height: int = 300,
+    output_width: int = 96,
+    global_angle_step: int = 5,
+    local_angle_step: int = 5,
+    seam_trim: int = 3,
+) -> StraightenedChromosomeImage:
+    aligned_gray, aligned_mask, global_degree, bend_row, _ = _find_best_global_bend_rotation(
+        gray_image=gray_image,
+        mask=mask,
+        angle_step=global_angle_step,
+    )
+
+    if bend_row is None or bend_row <= 2 or bend_row >= aligned_gray.shape[0] - 2:
+        return extract_straightened_chromosome_image(
+            gray_image=gray_image,
+            mask=mask,
+            output_height=output_height,
+            output_width=output_width,
+            smooth_kernel_size=5,
+        )
+
+    upper_gray = aligned_gray[:bend_row, :]
+    lower_gray = aligned_gray[bend_row:, :]
+    upper_mask = aligned_mask[:bend_row, :]
+    lower_mask = aligned_mask[bend_row:, :]
+
+    upper_rot_gray, upper_rot_mask, _ = _find_min_width_rotation(
+        gray_image=upper_gray,
+        mask=upper_mask,
+        angle_step=local_angle_step,
+    )
+    lower_rot_gray, lower_rot_mask, _ = _find_min_width_rotation(
+        gray_image=lower_gray,
+        mask=lower_mask,
+        angle_step=local_angle_step,
+    )
+
+    target_width = max(upper_rot_gray.shape[1], lower_rot_gray.shape[1])
+    upper_rot_gray = _pad_right_to_width(upper_rot_gray, target_width, fill_value=1.0)
+    lower_rot_gray = _pad_right_to_width(lower_rot_gray, target_width, fill_value=1.0)
+    upper_rot_mask = _pad_right_to_width(upper_rot_mask.astype(np.float32), target_width, fill_value=0.0) > 0.5
+    lower_rot_mask = _pad_right_to_width(lower_rot_mask.astype(np.float32), target_width, fill_value=0.0) > 0.5
+
+    trim = max(int(seam_trim), 0)
+    upper_keep = upper_rot_gray[:-trim, :] if trim > 0 and upper_rot_gray.shape[0] > trim else upper_rot_gray
+    lower_keep = lower_rot_gray[trim:, :] if trim > 0 and lower_rot_gray.shape[0] > trim else lower_rot_gray
+    upper_mask_keep = upper_rot_mask[:-trim, :] if trim > 0 and upper_rot_mask.shape[0] > trim else upper_rot_mask
+    lower_mask_keep = lower_rot_mask[trim:, :] if trim > 0 and lower_rot_mask.shape[0] > trim else lower_rot_mask
+
+    sewn_gray = np.concatenate([upper_keep, lower_keep], axis=0).astype(np.float32)
+    sewn_mask = np.concatenate([upper_mask_keep, lower_mask_keep], axis=0).astype(np.float32)
+    if sewn_gray.size == 0:
+        sewn_gray = aligned_gray.astype(np.float32)
+        sewn_mask = aligned_mask.astype(np.float32)
+
+    straightened_image = _resize_gray_image(sewn_gray, out_width=output_width, out_height=output_height)
+    straightened_mask = _resize_gray_image(sewn_mask.astype(np.float32), out_width=output_width, out_height=output_height)
+    straightened_mask = (straightened_mask > 0.35).astype(np.float32)
+    straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+    straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+
+    valid_profile_fraction = float(straightened_mask.mean())
+    return StraightenedChromosomeImage(
+        image=straightened_image,
+        mask=straightened_mask,
+        major_axis_angle_deg=float(global_degree),
+        foreground_area=int(np.asarray(sewn_mask > 0.5, dtype=np.uint8).sum()),
+        bbox_height=int(sewn_gray.shape[0]),
+        bbox_width=int(sewn_gray.shape[1]),
+        valid_profile_fraction=float(valid_profile_fraction),
+    )
+
+
 def extract_straightened_chromosome_image(
     gray_image: np.ndarray,
     mask: np.ndarray,
     output_height: int = 300,
     output_width: int = 96,
     smooth_kernel_size: int = 5,
+    method: str = "centerline_unfold",
+    global_angle_step: int = 5,
+    local_angle_step: int = 5,
+    seam_trim: int = 3,
 ) -> StraightenedChromosomeImage:
+    if method == "projection_split_v1":
+        return extract_projection_split_straightened_image(
+            gray_image=gray_image,
+            mask=mask,
+            output_height=output_height,
+            output_width=output_width,
+            global_angle_step=global_angle_step,
+            local_angle_step=local_angle_step,
+            seam_trim=seam_trim,
+        )
+    if method != "centerline_unfold":
+        raise ValueError(f"Unsupported straightening method: {method}")
+
     aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
 
     band_image_raw, _, _, valid_fraction = build_centerline_band_image(
@@ -831,6 +1146,10 @@ def extract_straightened_chromosome_image_from_path(
     output_height: int = 300,
     output_width: int = 96,
     smooth_kernel_size: int = 5,
+    method: str = "centerline_unfold",
+    global_angle_step: int = 5,
+    local_angle_step: int = 5,
+    seam_trim: int = 3,
 ) -> StraightenedChromosomeImage:
     gray_image = load_grayscale_image(image_path)
     mask = estimate_foreground_mask(gray_image)
@@ -840,6 +1159,10 @@ def extract_straightened_chromosome_image_from_path(
         output_height=output_height,
         output_width=output_width,
         smooth_kernel_size=smooth_kernel_size,
+        method=method,
+        global_angle_step=global_angle_step,
+        local_angle_step=local_angle_step,
+        seam_trim=seam_trim,
     )
 
 
