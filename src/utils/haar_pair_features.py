@@ -406,6 +406,52 @@ def _prepare_aligned_crop(gray_image: np.ndarray, mask: np.ndarray) -> Tuple[np.
     return aligned_image.astype(np.float32), aligned_mask.astype(bool), float(angle_deg)
 
 
+def repair_vertical_chromosome_mask(mask: np.ndarray, smooth_kernel_size: int = 11) -> np.ndarray:
+    mask = np.asarray(mask, dtype=bool)
+    if mask.sum() == 0:
+        return mask
+
+    h, w = mask.shape
+    left_edges = np.full(h, np.nan, dtype=np.float32)
+    right_edges = np.full(h, np.nan, dtype=np.float32)
+
+    for row_idx in range(h):
+        cols = np.where(mask[row_idx])[0]
+        if cols.size == 0:
+            continue
+        left_edges[row_idx] = float(cols.min())
+        right_edges[row_idx] = float(cols.max())
+
+    valid_rows = np.where(np.isfinite(left_edges) & np.isfinite(right_edges))[0]
+    if valid_rows.size < 3:
+        return mask
+
+    row_axis = np.arange(h, dtype=np.float32)
+    left_interp = np.interp(row_axis, valid_rows.astype(np.float32), left_edges[valid_rows]).astype(np.float32)
+    right_interp = np.interp(row_axis, valid_rows.astype(np.float32), right_edges[valid_rows]).astype(np.float32)
+
+    kernel = max(int(smooth_kernel_size) | 1, 3)
+    if kernel < h:
+        left_interp = moving_average_1d(left_interp, kernel_size=kernel)
+        right_interp = moving_average_1d(right_interp, kernel_size=kernel)
+
+    widths = np.maximum(right_interp - left_interp + 1.0, 1.0)
+    median_width = float(np.median(widths[valid_rows])) if valid_rows.size > 0 else 1.0
+    expand = max(1.0, 0.08 * median_width)
+
+    repaired = np.zeros_like(mask, dtype=bool)
+    start_row = int(valid_rows.min())
+    end_row = int(valid_rows.max())
+    for row_idx in range(start_row, end_row + 1):
+        left = int(np.floor(max(left_interp[row_idx] - expand, 0.0)))
+        right = int(np.ceil(min(right_interp[row_idx] + expand, w - 1.0)))
+        if right >= left:
+            repaired[row_idx, left : right + 1] = True
+
+    repaired |= mask
+    return largest_connected_component(repaired)
+
+
 def _resize_gray_image(image: np.ndarray, out_width: int, out_height: int) -> np.ndarray:
     image = np.asarray(image, dtype=np.float32)
     if cv2 is not None:
@@ -630,6 +676,7 @@ def extract_projection_split_straightened_image(
         mask=mask,
         angle_step=global_angle_step,
     )
+    aligned_mask = repair_vertical_chromosome_mask(aligned_mask)
 
     if bend_row is None or bend_row <= 2 or bend_row >= aligned_gray.shape[0] - 2:
         return extract_straightened_chromosome_image(
@@ -644,6 +691,8 @@ def extract_projection_split_straightened_image(
     lower_gray = aligned_gray[bend_row:, :]
     upper_mask = aligned_mask[:bend_row, :]
     lower_mask = aligned_mask[bend_row:, :]
+    upper_mask = repair_vertical_chromosome_mask(upper_mask)
+    lower_mask = repair_vertical_chromosome_mask(lower_mask)
 
     upper_rot_gray, upper_rot_mask, _ = _find_min_width_rotation(
         gray_image=upper_gray,
@@ -717,6 +766,7 @@ def extract_straightened_chromosome_image(
         raise ValueError(f"Unsupported straightening method: {method}")
 
     aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
+    aligned_mask = repair_vertical_chromosome_mask(aligned_mask)
 
     band_image_raw, _, _, valid_fraction = build_centerline_band_image(
         gray_image=aligned_image,

@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument("--output_image_dir", required=True)
     parser.add_argument("--output_report_dir", required=True)
     parser.add_argument("--output_height", type=int, default=300)
-    parser.add_argument("--output_width", type=int, default=96)
+    parser.add_argument("--output_width", type=int, default=160)
     parser.add_argument(
         "--canvas_size",
         type=int,
