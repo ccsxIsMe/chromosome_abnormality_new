@@ -290,6 +290,50 @@ def build_masked_band_overlay(image_rgb, band_profile, foreground_mask, alpha=0.
     return build_overlay(image_rgb, band_map, alpha=alpha), band_map
 
 
+def cosine_similarity_1d(a, b):
+    a = np.asarray(a, dtype=np.float32).reshape(-1)
+    b = np.asarray(b, dtype=np.float32).reshape(-1)
+    denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+    if denom <= 1e-12:
+        return 0.0
+    return float(np.dot(a, b) / denom)
+
+
+def pearson_correlation_1d(a, b):
+    a = np.asarray(a, dtype=np.float32).reshape(-1)
+    b = np.asarray(b, dtype=np.float32).reshape(-1)
+    if a.size == 0 or b.size == 0:
+        return 0.0
+    a_std = float(a.std())
+    b_std = float(b.std())
+    if a_std <= 1e-12 or b_std <= 1e-12:
+        return 0.0
+    return float(np.corrcoef(a, b)[0, 1])
+
+
+def compute_profile_alignment_stats(left_profile, right_profile):
+    left_profile = normalize_map(left_profile)
+    right_profile = normalize_map(right_profile)
+    right_profile_rev = right_profile[::-1].copy()
+
+    stats = {
+        "left_profile": left_profile,
+        "right_profile": right_profile,
+        "right_profile_reversed": right_profile_rev,
+        "pearson_direct": pearson_correlation_1d(left_profile, right_profile),
+        "pearson_reverse": pearson_correlation_1d(left_profile, right_profile_rev),
+        "cosine_direct": cosine_similarity_1d(left_profile, right_profile),
+        "cosine_reverse": cosine_similarity_1d(left_profile, right_profile_rev),
+    }
+    stats["reverse_minus_direct_pearson"] = (
+        stats["pearson_reverse"] - stats["pearson_direct"]
+    )
+    stats["reverse_minus_direct_cosine"] = (
+        stats["cosine_reverse"] - stats["cosine_direct"]
+    )
+    return stats
+
+
 def compute_cam_from_record(record, out_hw):
     activation = record["activation"]
     grad = record["grad"]
@@ -326,6 +370,7 @@ def to_python_scalar(value):
 
 
 def build_metadata_text(row, score_column, pred_column, model_output):
+    profile_stats = row.get("_profile_stats", {})
     lines = [
         f"confusion_group: {row.get('confusion_group', '')}",
         f"label: {int(row['label'])}",
@@ -349,6 +394,12 @@ def build_metadata_text(row, score_column, pred_column, model_output):
         f"reverse_diag_similarity: {float(to_python_scalar(model_output['reverse_diag_similarity'][0])):.6f}"
         if "reverse_diag_similarity" in model_output
         else "",
+        f"profile_pearson_direct: {float(profile_stats.get('pearson_direct', 0.0)):.4f}",
+        f"profile_pearson_reverse: {float(profile_stats.get('pearson_reverse', 0.0)):.4f}",
+        f"profile_cosine_direct: {float(profile_stats.get('cosine_direct', 0.0)):.4f}",
+        f"profile_cosine_reverse: {float(profile_stats.get('cosine_reverse', 0.0)):.4f}",
+        f"reverse_minus_direct_pearson: {float(profile_stats.get('reverse_minus_direct_pearson', 0.0)):.4f}",
+        f"reverse_minus_direct_cosine: {float(profile_stats.get('reverse_minus_direct_cosine', 0.0)):.4f}",
         f"left_file: {row.get('left_filename', os.path.basename(str(row.get('left_path', ''))))}",
         f"right_file: {row.get('right_filename', os.path.basename(str(row.get('right_path', ''))))}",
     ]
@@ -370,10 +421,11 @@ def save_explanation_panel(
     corr_delta,
     metadata_text,
     title,
+    profile_stats,
     left_gradcam2d=None,
     right_gradcam2d=None,
 ):
-    fig, axes = plt.subplots(2, 4, figsize=(18, 8))
+    fig, axes = plt.subplots(2, 5, figsize=(22, 8))
     fig.suptitle(title, fontsize=13)
 
     axes[0, 0].imshow(left_image)
@@ -390,10 +442,15 @@ def save_explanation_panel(
     axes[0, 2].set_ylabel("Left token index")
     fig.colorbar(im, ax=axes[0, 2], fraction=0.046, pad=0.04)
 
-    axes[0, 3].imshow(corr_delta, cmap="bwr", aspect="auto", vmin=-1.0, vmax=1.0)
-    axes[0, 3].set_title("Corr delta (reverse - direct)")
+    axes[0, 3].imshow(direct_corr, cmap="viridis", aspect="auto", vmin=0.0, vmax=1.0)
+    axes[0, 3].set_title("Direct correlation")
     axes[0, 3].set_xlabel("Right token index")
     axes[0, 3].set_ylabel("Left token index")
+
+    axes[0, 4].imshow(reverse_corr, cmap="viridis", aspect="auto", vmin=0.0, vmax=1.0)
+    axes[0, 4].set_title("Reverse correlation")
+    axes[0, 4].set_xlabel("Right token index")
+    axes[0, 4].set_ylabel("Left token index")
 
     axes[1, 0].imshow(right_image)
     axes[1, 0].set_title("Right chromosome")
@@ -403,14 +460,23 @@ def save_explanation_panel(
     axes[1, 1].set_title("Right band saliency")
     axes[1, 1].axis("off")
 
-    axes[1, 2].plot(left_foreground_mask.mean(axis=1), np.arange(left_foreground_mask.shape[0]), label="left mask")
-    axes[1, 2].plot(right_foreground_mask.mean(axis=1), np.arange(right_foreground_mask.shape[0]), label="right mask")
+    y_axis = np.arange(len(profile_stats["left_profile"]))
+    axes[1, 2].plot(profile_stats["left_profile"], y_axis, label="left", linewidth=2.0)
+    axes[1, 2].plot(profile_stats["right_profile"], y_axis, label="right", linewidth=1.6)
+    axes[1, 2].plot(profile_stats["right_profile_reversed"], y_axis, label="flip(right)", linewidth=1.6)
     axes[1, 2].invert_yaxis()
-    axes[1, 2].set_title("Foreground profile")
+    axes[1, 2].set_title("Band profile alignment")
+    axes[1, 2].set_xlabel("Normalized saliency")
+    axes[1, 2].set_ylabel("Long-axis position")
     axes[1, 2].legend(loc="lower right", fontsize=8)
 
-    axes[1, 3].axis("off")
-    axes[1, 3].text(
+    axes[1, 3].imshow(corr_delta, cmap="bwr", aspect="auto", vmin=-1.0, vmax=1.0)
+    axes[1, 3].set_title("Corr delta (reverse - direct)")
+    axes[1, 3].set_xlabel("Right token index")
+    axes[1, 3].set_ylabel("Left token index")
+
+    axes[1, 4].axis("off")
+    axes[1, 4].text(
         0.0,
         1.0,
         metadata_text,
@@ -498,6 +564,7 @@ def visualize_one_sample(
 
     left_band_profile = compute_band_profile_from_record(recorder.records[0], out_hw[0])
     right_band_profile = compute_band_profile_from_record(recorder.records[1], out_hw[0])
+    profile_stats = compute_profile_alignment_stats(left_band_profile, right_band_profile)
     left_band_overlay, _ = build_masked_band_overlay(left_rgb, left_band_profile, left_mask)
     right_band_overlay, _ = build_masked_band_overlay(right_rgb, right_band_profile, right_mask)
 
@@ -518,6 +585,8 @@ def visualize_one_sample(
         f"{row.get('confusion_group', '')} | chr {row.get('chromosome_id', '')} | "
         f"label={int(row['label'])} pred={int(row[pred_column])}"
     )
+    row = row.copy()
+    row["_profile_stats"] = profile_stats
     metadata_text = build_metadata_text(row, score_column, pred_column, model_output)
     save_explanation_panel(
         output_path=save_path,
@@ -533,9 +602,11 @@ def visualize_one_sample(
         corr_delta=corr_delta,
         metadata_text=metadata_text,
         title=title,
+        profile_stats=profile_stats,
         left_gradcam2d=left_gradcam2d,
         right_gradcam2d=right_gradcam2d,
     )
+    return profile_stats
 
 
 def main():
@@ -616,7 +687,7 @@ def main():
             file_stem = f"{batch_index:02d}_{group}_case-{case_id}_pair-{pair_key}".replace("/", "_").replace("\\", "_")
             save_path = save_dir / f"{file_stem}.png"
 
-            visualize_one_sample(
+            profile_stats = visualize_one_sample(
                 model=model,
                 recorder=recorder,
                 sample=simple_sample,
@@ -641,6 +712,12 @@ def main():
                     "chromosome_id": str(row.get("chromosome_id", "")),
                     "abnormal_subtype_id": str(row.get("abnormal_subtype_id", "")),
                     "subtype_status": str(row.get("subtype_status", "")),
+                    "profile_pearson_direct": float(profile_stats["pearson_direct"]),
+                    "profile_pearson_reverse": float(profile_stats["pearson_reverse"]),
+                    "profile_cosine_direct": float(profile_stats["cosine_direct"]),
+                    "profile_cosine_reverse": float(profile_stats["cosine_reverse"]),
+                    "reverse_minus_direct_pearson": float(profile_stats["reverse_minus_direct_pearson"]),
+                    "reverse_minus_direct_cosine": float(profile_stats["reverse_minus_direct_cosine"]),
                     "left_path": str(row.get("left_path", "")),
                     "right_path": str(row.get("right_path", "")),
                 }
