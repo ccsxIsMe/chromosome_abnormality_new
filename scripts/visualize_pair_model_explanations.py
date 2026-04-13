@@ -74,6 +74,18 @@ def parse_args():
     )
     parser.add_argument("--num_per_group", type=int, default=4)
     parser.add_argument(
+        "--target_mode",
+        default="anomaly_score",
+        choices=["anomaly_score", "pair_distance", "reverse_gain", "direct_mismatch"],
+        help="Backprop target for attribution.",
+    )
+    parser.add_argument(
+        "--cam_mode",
+        default="band",
+        choices=["band", "gradcam2d", "both"],
+        help="band: width-collapsed saliency masked to chromosome foreground; gradcam2d: classic 2D Grad-CAM; both: save both views.",
+    )
+    parser.add_argument(
         "--sort_mode",
         default="confidence",
         choices=["confidence", "score", "random"],
@@ -236,11 +248,46 @@ def normalize_map(array):
     return array
 
 
+def estimate_foreground_mask(image_rgb):
+    h, w, _ = image_rgb.shape
+    patch_h = max(4, h // 12)
+    patch_w = max(4, w // 12)
+    corner_patches = [
+        image_rgb[:patch_h, :patch_w],
+        image_rgb[:patch_h, -patch_w:],
+        image_rgb[-patch_h:, :patch_w],
+        image_rgb[-patch_h:, -patch_w:],
+    ]
+    bg_pixels = np.concatenate([patch.reshape(-1, 3) for patch in corner_patches], axis=0)
+    bg_mean = bg_pixels.mean(axis=0, keepdims=True)
+    bg_dist = np.linalg.norm(image_rgb - bg_mean, axis=2)
+    bg_corner_dist = np.linalg.norm(bg_pixels - bg_mean, axis=1)
+    threshold = max(float(np.quantile(bg_corner_dist, 0.995)) + 0.02, 0.04)
+    mask = bg_dist > threshold
+
+    mask_tensor = torch.from_numpy(mask.astype(np.float32))[None, None]
+    mask_tensor = F.avg_pool2d(mask_tensor, kernel_size=7, stride=1, padding=3)
+    mask_tensor = (mask_tensor > 0.08).float()
+    mask_tensor = F.avg_pool2d(mask_tensor, kernel_size=9, stride=1, padding=4)
+    mask_tensor = (mask_tensor > 0.04).float()
+
+    return mask_tensor[0, 0].numpy().astype(np.float32)
+
+
 def build_overlay(image_rgb, heatmap, alpha=0.42):
     cmap = cm.get_cmap("jet")
     heat_rgb = cmap(np.clip(heatmap, 0.0, 1.0))[..., :3]
     overlay = (1.0 - alpha) * image_rgb + alpha * heat_rgb
     return np.clip(overlay, 0.0, 1.0)
+
+
+def build_masked_band_overlay(image_rgb, band_profile, foreground_mask, alpha=0.42):
+    h, w, _ = image_rgb.shape
+    band_profile = np.asarray(band_profile, dtype=np.float32)
+    band_profile = normalize_map(band_profile)
+    band_map = np.repeat(band_profile[:, None], w, axis=1)
+    band_map = band_map * foreground_mask
+    return build_overlay(image_rgb, band_map, alpha=alpha), band_map
 
 
 def compute_cam_from_record(record, out_hw):
@@ -255,6 +302,19 @@ def compute_cam_from_record(record, out_hw):
     cam = F.interpolate(cam, size=out_hw, mode="bilinear", align_corners=False)
     cam = cam[0, 0].detach().cpu().numpy()
     return normalize_map(cam)
+
+
+def compute_band_profile_from_record(record, out_h):
+    activation = record["activation"]
+    grad = record["grad"]
+    if grad is None:
+        raise ValueError("Gradient was not captured for band saliency target module.")
+
+    weighted = F.relu((grad * activation).sum(dim=1, keepdim=False))
+    profile = weighted.mean(dim=2)
+    profile = F.interpolate(profile.unsqueeze(1), size=out_h, mode="linear", align_corners=False)
+    profile = profile[0, 0].detach().cpu().numpy()
+    return normalize_map(profile)
 
 
 def to_python_scalar(value):
@@ -300,42 +360,57 @@ def save_explanation_panel(
     output_path,
     left_image,
     right_image,
-    left_cam,
-    right_cam,
+    left_band_overlay,
+    right_band_overlay,
+    left_foreground_mask,
+    right_foreground_mask,
     interval_attention,
+    direct_corr,
+    reverse_corr,
+    corr_delta,
     metadata_text,
     title,
+    left_gradcam2d=None,
+    right_gradcam2d=None,
 ):
-    left_overlay = build_overlay(left_image, left_cam)
-    right_overlay = build_overlay(right_image, right_cam)
-
-    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    fig, axes = plt.subplots(2, 4, figsize=(18, 8))
     fig.suptitle(title, fontsize=13)
 
     axes[0, 0].imshow(left_image)
     axes[0, 0].set_title("Left chromosome")
     axes[0, 0].axis("off")
 
-    axes[0, 1].imshow(left_overlay)
-    axes[0, 1].set_title("Left Grad-CAM")
+    axes[0, 1].imshow(left_band_overlay)
+    axes[0, 1].set_title("Left band saliency")
     axes[0, 1].axis("off")
 
     im = axes[0, 2].imshow(interval_attention, cmap="magma", aspect="auto")
-    axes[0, 2].set_title("Pair interval attention")
+    axes[0, 2].set_title("Interval attention")
     axes[0, 2].set_xlabel("Right token index")
     axes[0, 2].set_ylabel("Left token index")
     fig.colorbar(im, ax=axes[0, 2], fraction=0.046, pad=0.04)
+
+    axes[0, 3].imshow(corr_delta, cmap="bwr", aspect="auto", vmin=-1.0, vmax=1.0)
+    axes[0, 3].set_title("Corr delta (reverse - direct)")
+    axes[0, 3].set_xlabel("Right token index")
+    axes[0, 3].set_ylabel("Left token index")
 
     axes[1, 0].imshow(right_image)
     axes[1, 0].set_title("Right chromosome")
     axes[1, 0].axis("off")
 
-    axes[1, 1].imshow(right_overlay)
-    axes[1, 1].set_title("Right Grad-CAM")
+    axes[1, 1].imshow(right_band_overlay)
+    axes[1, 1].set_title("Right band saliency")
     axes[1, 1].axis("off")
 
-    axes[1, 2].axis("off")
-    axes[1, 2].text(
+    axes[1, 2].plot(left_foreground_mask.mean(axis=1), np.arange(left_foreground_mask.shape[0]), label="left mask")
+    axes[1, 2].plot(right_foreground_mask.mean(axis=1), np.arange(right_foreground_mask.shape[0]), label="right mask")
+    axes[1, 2].invert_yaxis()
+    axes[1, 2].set_title("Foreground profile")
+    axes[1, 2].legend(loc="lower right", fontsize=8)
+
+    axes[1, 3].axis("off")
+    axes[1, 3].text(
         0.0,
         1.0,
         metadata_text,
@@ -345,9 +420,34 @@ def save_explanation_panel(
         family="monospace",
     )
 
+    if left_gradcam2d is not None and right_gradcam2d is not None:
+        extra_path = Path(output_path).with_name(Path(output_path).stem + "__gradcam2d" + Path(output_path).suffix)
+        extra_fig, extra_axes = plt.subplots(1, 2, figsize=(10, 4))
+        extra_axes[0].imshow(left_gradcam2d)
+        extra_axes[0].set_title("Left classic Grad-CAM")
+        extra_axes[0].axis("off")
+        extra_axes[1].imshow(right_gradcam2d)
+        extra_axes[1].set_title("Right classic Grad-CAM")
+        extra_axes[1].axis("off")
+        plt.tight_layout()
+        extra_fig.savefig(extra_path, dpi=220, bbox_inches="tight")
+        plt.close(extra_fig)
+
     plt.tight_layout()
     fig.savefig(output_path, dpi=220, bbox_inches="tight")
     plt.close(fig)
+
+
+def select_attribution_target(model_output, target_mode):
+    if target_mode == "anomaly_score":
+        return model_output["anomaly_score"][0]
+    if target_mode == "pair_distance":
+        return model_output["pair_distance"][0]
+    if target_mode == "reverse_gain":
+        return model_output["reverse_gain"][0]
+    if target_mode == "direct_mismatch":
+        return 1.0 - model_output["direct_diag_similarity"][0]
+    raise ValueError(f"Unsupported target_mode: {target_mode}")
 
 
 def visualize_one_sample(
@@ -359,6 +459,7 @@ def visualize_one_sample(
     pred_column,
     score_column,
     save_path,
+    args,
 ):
     recorder.clear()
     model.zero_grad(set_to_none=True)
@@ -373,7 +474,7 @@ def visualize_one_sample(
         else:
             model_output = model(left_image, right_image, chr_idx)
 
-        target = model_output["anomaly_score"][0]
+        target = select_attribution_target(model_output, args.target_mode)
         target.backward()
 
     if len(recorder.records) < 2:
@@ -384,15 +485,34 @@ def visualize_one_sample(
     left_rgb = tensor_to_rgb_image(sample["left_image"])
     right_rgb = tensor_to_rgb_image(sample["right_image"])
     out_hw = left_rgb.shape[:2]
+    left_mask = estimate_foreground_mask(left_rgb)
+    right_mask = estimate_foreground_mask(right_rgb)
 
-    left_cam = compute_cam_from_record(recorder.records[0], out_hw)
-    right_cam = compute_cam_from_record(recorder.records[1], out_hw)
+    left_gradcam2d = None
+    right_gradcam2d = None
+    if args.cam_mode in {"gradcam2d", "both"}:
+        left_cam_2d = compute_cam_from_record(recorder.records[0], out_hw)
+        right_cam_2d = compute_cam_from_record(recorder.records[1], out_hw)
+        left_gradcam2d = build_overlay(left_rgb, left_cam_2d * left_mask)
+        right_gradcam2d = build_overlay(right_rgb, right_cam_2d * right_mask)
 
-    if "interval_attention" in model_output:
-        interval_attention = model_output["interval_attention"][0, 0].detach().cpu().numpy()
-        interval_attention = normalize_map(interval_attention)
-    else:
-        interval_attention = np.zeros((8, 8), dtype=np.float32)
+    left_band_profile = compute_band_profile_from_record(recorder.records[0], out_hw[0])
+    right_band_profile = compute_band_profile_from_record(recorder.records[1], out_hw[0])
+    left_band_overlay, _ = build_masked_band_overlay(left_rgb, left_band_profile, left_mask)
+    right_band_overlay, _ = build_masked_band_overlay(right_rgb, right_band_profile, right_mask)
+
+    interval_attention = normalize_map(
+        model_output.get("interval_attention", torch.zeros(1, 1, 8, 8, device=device))[0, 0].detach().cpu().numpy()
+    )
+    direct_corr = normalize_map(
+        model_output.get("direct_corr", torch.zeros(1, 8, 8, device=device))[0].detach().cpu().numpy()
+    )
+    reverse_corr = normalize_map(
+        model_output.get("reverse_corr", torch.zeros(1, 8, 8, device=device))[0].detach().cpu().numpy()
+    )
+    corr_delta = model_output.get("corr_delta", torch.zeros(1, 8, 8, device=device))[0].detach().cpu().numpy()
+    max_abs = max(float(np.abs(corr_delta).max()), 1e-6)
+    corr_delta = np.clip(corr_delta / max_abs, -1.0, 1.0)
 
     title = (
         f"{row.get('confusion_group', '')} | chr {row.get('chromosome_id', '')} | "
@@ -403,11 +523,18 @@ def visualize_one_sample(
         output_path=save_path,
         left_image=left_rgb,
         right_image=right_rgb,
-        left_cam=left_cam,
-        right_cam=right_cam,
+        left_band_overlay=left_band_overlay,
+        right_band_overlay=right_band_overlay,
+        left_foreground_mask=left_mask,
+        right_foreground_mask=right_mask,
         interval_attention=interval_attention,
+        direct_corr=direct_corr,
+        reverse_corr=reverse_corr,
+        corr_delta=corr_delta,
         metadata_text=metadata_text,
         title=title,
+        left_gradcam2d=left_gradcam2d,
+        right_gradcam2d=right_gradcam2d,
     )
 
 
@@ -498,6 +625,7 @@ def main():
                 pred_column=pred_column,
                 score_column=score_column,
                 save_path=save_path,
+                args=args,
             )
 
             manifest_rows.append(
@@ -531,6 +659,8 @@ def main():
         f"- score_column: `{score_column}`",
         f"- groups: `{','.join(groups)}`",
         f"- num_per_group: `{args.num_per_group}`",
+        f"- target_mode: `{args.target_mode}`",
+        f"- cam_mode: `{args.cam_mode}`",
         "",
         "Saved files:",
         f"- manifest: `{save_dir / 'manifest.csv'}`",
