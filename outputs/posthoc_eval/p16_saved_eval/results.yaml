@@ -1,0 +1,628 @@
+config_path: configs/p16_pair_normal_only_v1_correspondence_interval_convnext_tiny_multi_prototype_metric.yaml
+checkpoint_path: outputs/experiments/p16_pair_normal_only_v1_correspondence_interval_convnext_tiny_multi_prototype_metric/best_model.pth
+save_dir: outputs/posthoc_eval/p16_saved_eval
+split_summary:
+  train_csv: data_protocol/p12_pair_normal_only_v1/train.csv
+  val_csv: data_protocol/p12_pair_normal_only_v1/val.csv
+  test_csv: data_protocol/p12_pair_normal_only_v1/test.csv
+  train_has_case_id: true
+  train_num_cases: 20
+  val_has_case_id: true
+  val_num_cases: 6
+  test_has_case_id: true
+  test_num_cases: 6
+  case_isolation_checkable: true
+  train_val_overlap_cases: []
+  train_test_overlap_cases: []
+  val_test_overlap_cases: []
+  num_train_val_overlap: 0
+  num_train_test_overlap: 0
+  num_val_test_overlap: 0
+  is_case_isolated: true
+best_threshold: 0.00021998726542870603
+best_threshold_score: 0.27329192546583847
+best_threshold_stats:
+  precision: 0.3793103448275862
+  recall: 0.21359223300970873
+  f1: 0.27329192546583847
+  balanced_acc: 0.598817393100599
+train_metrics_05:
+  auroc: null
+  auprc: -0.0
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 1.0
+  confusion_matrix:
+    tn: 11814
+    fp: 0
+    fn: 0
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 1.0
+    recall: 1.0
+    f1: 1.0
+    support: 11814
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  loss: 3.9140741616856516e-05
+val_metrics_05:
+  auroc: 0.7356649796873924
+  auprc: 0.2149668973583567
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2256
+    fp: 0
+    fn: 103
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9563374311148792
+    recall: 1.0
+    f1: 0.9776814734561213
+    support: 2256
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 103
+  loss: 0.00012534446844323006
+test_metrics_05:
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2221
+    fp: 0
+    fn: 104
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9552688172043011
+    recall: 1.0
+    f1: 0.9771227452705675
+    support: 2221
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 104
+  loss: 7.236628405754805e-05
+test_metrics_best:
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.5829145728643217
+  precision_abnormal: 0.6105263157894737
+  recall_abnormal: 0.5576923076923077
+  balanced_acc: 0.7705165725764556
+  confusion_matrix:
+    tn: 2184
+    fp: 37
+    fn: 46
+    tp: 58
+  normal:
+    acc: 0.9833408374606033
+    precision: 0.979372197309417
+    recall: 0.9833408374606033
+    f1: 0.9813525050550439
+    support: 2221
+  abnormal:
+    acc: 0.5576923076923077
+    precision: 0.6105263157894737
+    recall: 0.5576923076923077
+    f1: 0.5829145728643217
+    support: 104
+  loss: 7.236628405754805e-05
+val_casewise_metrics_05:
+  auroc: 0.7307740308476209
+  auprc: 0.19463978575124521
+  f1: 0.2650602409638554
+  precision_abnormal: 0.3492063492063492
+  recall_abnormal: 0.21359223300970873
+  balanced_acc: 0.5977092370722302
+  confusion_matrix:
+    tn: 2215
+    fp: 41
+    fn: 81
+    tp: 22
+  normal:
+    acc: 0.9818262411347518
+    precision: 0.9647212543554007
+    recall: 0.9818262411347518
+    f1: 0.9731985940246046
+    support: 2256
+  abnormal:
+    acc: 0.21359223300970873
+    precision: 0.3492063492063492
+    recall: 0.21359223300970873
+    f1: 0.2650602409638554
+    support: 103
+val_casewise_best:
+  auroc: 0.7307740308476209
+  auprc: 0.19463978575124521
+  f1: 0.2975206611570248
+  precision_abnormal: 0.2589928057553957
+  recall_abnormal: 0.34951456310679613
+  balanced_acc: 0.6519292673690009
+  confusion_matrix:
+    tn: 2153
+    fp: 103
+    fn: 67
+    tp: 36
+  normal:
+    acc: 0.9543439716312057
+    precision: 0.9698198198198198
+    recall: 0.9543439716312057
+    f1: 0.9620196604110813
+    support: 2256
+  abnormal:
+    acc: 0.34951456310679613
+    precision: 0.2589928057553957
+    recall: 0.34951456310679613
+    f1: 0.2975206611570248
+    support: 103
+  loss: 0.00012534446844323006
+test_casewise_metrics_05:
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.4526315789473684
+  precision_abnormal: 0.5
+  recall_abnormal: 0.41346153846153844
+  balanced_acc: 0.6970504450524712
+  confusion_matrix:
+    tn: 2178
+    fp: 43
+    fn: 61
+    tp: 43
+  normal:
+    acc: 0.9806393516434039
+    precision: 0.9727556945064761
+    recall: 0.9806393516434039
+    f1: 0.9766816143497759
+    support: 2221
+  abnormal:
+    acc: 0.41346153846153844
+    precision: 0.5
+    recall: 0.41346153846153844
+    f1: 0.4526315789473684
+    support: 104
+  loss: 7.236628405754805e-05
+test_casewise_best:
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.4280442804428044
+  precision_abnormal: 0.3473053892215569
+  recall_abnormal: 0.5576923076923077
+  balanced_acc: 0.7543076576732588
+  confusion_matrix:
+    tn: 2112
+    fp: 109
+    fn: 46
+    tp: 58
+  normal:
+    acc: 0.9509230076542098
+    precision: 0.9786839666357738
+    recall: 0.9509230076542098
+    f1: 0.9646037908198218
+    support: 2221
+  abnormal:
+    acc: 0.5576923076923077
+    precision: 0.3473053892215569
+    recall: 0.5576923076923077
+    f1: 0.4280442804428044
+    support: 104
+  loss: 7.236628405754805e-05
+casewise_best_threshold: 0.03219285855520604
+casewise_best_threshold_score: 0.2975206611570248
+casewise_best_threshold_stats:
+  precision: 0.2589928057553957
+  recall: 0.34951456310679613
+  f1: 0.2975206611570248
+  balanced_acc: 0.6519292673690009
+anomaly_threshold: null
+anomaly_threshold_stats: null
+test_metrics_anomaly_threshold: null
+test_seen_best_raw:
+  auroc: null
+  auprc: 1.0
+  f1: 0.4615384615384615
+  precision_abnormal: 1.0
+  recall_abnormal: 0.3
+  balanced_acc: 0.3
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 14
+    tp: 6
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.3
+    precision: 1.0
+    recall: 0.3
+    f1: 0.4615384615384615
+    support: 20
+  count: 20
+test_unseen_best_raw:
+  auroc: null
+  auprc: 0.9999999999999999
+  f1: 0.7647058823529412
+  precision_abnormal: 1.0
+  recall_abnormal: 0.6190476190476191
+  balanced_acc: 0.6190476190476191
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 32
+    tp: 52
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.6190476190476191
+    precision: 1.0
+    recall: 0.6190476190476191
+    f1: 0.7647058823529412
+    support: 84
+  count: 84
+test_by_subtype_best_raw:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.0
+  mean_score: 3.59266996383667e-05
+  min_score: 3.170967102050781e-05
+  max_score: 4.035234451293945e-05
+  case_ids: M182418
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.53125
+  mean_score: 0.0020429715514183044
+  min_score: 6.282329559326172e-05
+  max_score: 0.01057577133178711
+  case_ids: '75263'
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  mean_score: 2.530813217163086e-05
+  min_score: 2.276897430419922e-05
+  max_score: 3.0040740966796875e-05
+  case_ids: Y19361M
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  mean_score: 0.0037497946194240024
+  min_score: 0.0003071427345275879
+  max_score: 0.009618163108825684
+  case_ids: Q250870
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  mean_score: 0.007531056801478068
+  min_score: 0.0006949305534362793
+  max_score: 0.013444960117340088
+  case_ids: Q242664M
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.0
+  mean_score: 3.340314416324391e-05
+  min_score: 2.7239322662353516e-05
+  max_score: 6.979703903198242e-05
+  case_ids: '76018'
+test_seen_best_casewise:
+  auroc: null
+  auprc: 1.0
+  f1: 0.4615384615384615
+  precision_abnormal: 1.0
+  recall_abnormal: 0.3
+  balanced_acc: 0.3
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 14
+    tp: 6
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.3
+    precision: 1.0
+    recall: 0.3
+    f1: 0.4615384615384615
+    support: 20
+  count: 20
+test_unseen_best_casewise:
+  auroc: null
+  auprc: 0.9999999999999999
+  f1: 0.7647058823529412
+  precision_abnormal: 1.0
+  recall_abnormal: 0.6190476190476191
+  balanced_acc: 0.6190476190476191
+  confusion_matrix:
+    tn: 0
+    fp: 0
+    fn: 32
+    tp: 52
+  normal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 0
+  abnormal:
+    acc: 0.6190476190476191
+    precision: 1.0
+    recall: 0.6190476190476191
+    f1: 0.7647058823529412
+    support: 84
+  count: 84
+test_by_subtype_best_casewise:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.0
+  mean_score: -0.12343544686316354
+  min_score: -0.12838695321481908
+  max_score: -0.11823898966725649
+  case_ids: M182418
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.5
+  mean_score: 1.5988520162849533
+  min_score: -0.1117993410761276
+  max_score: 8.970343258639652
+  case_ids: '75263'
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  mean_score: -0.413968452703681
+  min_score: -0.4813852285096557
+  max_score: -0.28831371094324915
+  case_ids: Y19361M
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  mean_score: 3.2943462373494037
+  min_score: 0.07091473520240851
+  max_score: 8.789030128547807
+  case_ids: Q250870
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  mean_score: 3.8547009473450338
+  min_score: 0.17729804079035347
+  max_score: 7.03600633196458
+  case_ids: Q242664M
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.058823529411764705
+  mean_score: -0.17773453025149014
+  min_score: -0.22731245149677315
+  max_score: 0.11499517539472004
+  case_ids: '76018'
+threshold_sweep:
+- score_name: raw
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 2.0
+  threshold: 0.0003694670340337325
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.5863874345549739
+  precision_abnormal: 0.6436781609195402
+  recall_abnormal: 0.5384615384615384
+  balanced_acc: 0.7622519308696707
+  tn: 2190
+  fp: 31
+  fn: 48
+  tp: 56
+- score_name: raw
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 2.5
+  threshold: 0.0004520486072578933
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.5806451612903226
+  precision_abnormal: 0.6585365853658537
+  recall_abnormal: 0.5192307692307693
+  balanced_acc: 0.7533119177085859
+  tn: 2193
+  fp: 28
+  fn: 50
+  tp: 54
+- score_name: raw
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 3.0
+  threshold: 0.0005346301804820541
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.5604395604395604
+  precision_abnormal: 0.6538461538461539
+  recall_abnormal: 0.49038461538461536
+  balanced_acc: 0.7391139646036089
+  tn: 2194
+  fp: 27
+  fn: 53
+  tp: 51
+- score_name: raw
+  threshold_family: quantile
+  quantile: 0.99
+  mean_std_k: null
+  threshold: 7.634580135345464e-05
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.546218487394958
+  precision_abnormal: 0.48507462686567165
+  recall_abnormal: 0.625
+  balanced_acc: 0.7969664565511031
+  tn: 2152
+  fp: 69
+  fn: 39
+  tp: 65
+- score_name: raw
+  threshold_family: quantile
+  quantile: 0.975
+  mean_std_k: null
+  threshold: 6.733387708663936e-05
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.5298507462686567
+  precision_abnormal: 0.4329268292682927
+  recall_abnormal: 0.6826923076923077
+  balanced_acc: 0.8204096387628581
+  tn: 2128
+  fp: 93
+  fn: 33
+  tp: 71
+- score_name: raw
+  threshold_family: quantile
+  quantile: 0.95
+  mean_std_k: null
+  threshold: 6.079673767089844e-05
+  auroc: 0.795851660721089
+  auprc: 0.4981329761048726
+  f1: 0.45679012345679015
+  precision_abnormal: 0.33636363636363636
+  recall_abnormal: 0.7115384615384616
+  balanced_acc: 0.8229011533266374
+  tn: 2075
+  fp: 146
+  fn: 30
+  tp: 74
+- score_name: casewise_zscore
+  threshold_family: quantile
+  quantile: 0.95
+  mean_std_k: null
+  threshold: 1.3145942211151136
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.4191616766467066
+  precision_abnormal: 0.5555555555555556
+  recall_abnormal: 0.33653846153846156
+  balanced_acc: 0.6619657638624321
+  tn: 2193
+  fp: 28
+  fn: 69
+  tp: 35
+- score_name: casewise_zscore
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 2.0
+  threshold: 1.8997369901327108
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.38749999999999996
+  precision_abnormal: 0.5535714285714286
+  recall_abnormal: 0.2980769230769231
+  balanced_acc: 0.6434103660859627
+  tn: 2196
+  fp: 25
+  fn: 73
+  tp: 31
+- score_name: casewise_zscore
+  threshold_family: quantile
+  quantile: 0.975
+  mean_std_k: null
+  threshold: 1.789235946536063
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.3850931677018634
+  precision_abnormal: 0.543859649122807
+  recall_abnormal: 0.2980769230769231
+  balanced_acc: 0.6431852422678627
+  tn: 2195
+  fp: 26
+  fn: 73
+  tp: 31
+- score_name: casewise_zscore
+  threshold_family: quantile
+  quantile: 0.99
+  mean_std_k: null
+  threshold: 2.445957486629489
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.3355704697986577
+  precision_abnormal: 0.5555555555555556
+  recall_abnormal: 0.2403846153846154
+  balanced_acc: 0.6156898313303086
+  tn: 2201
+  fp: 20
+  fn: 79
+  tp: 25
+- score_name: casewise_zscore
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 2.5
+  threshold: 2.374671240249059
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.3355704697986577
+  precision_abnormal: 0.5555555555555556
+  recall_abnormal: 0.2403846153846154
+  balanced_acc: 0.6156898313303086
+  tn: 2201
+  fp: 20
+  fn: 79
+  tp: 25
+- score_name: casewise_zscore
+  threshold_family: mean_std
+  quantile: null
+  mean_std_k: 3.0
+  threshold: 2.8496054903654073
+  auroc: 0.7598773075191354
+  auprc: 0.35290057399781694
+  f1: 0.30344827586206896
+  precision_abnormal: 0.5365853658536586
+  recall_abnormal: 0.21153846153846154
+  balanced_acc: 0.6014918782253316
+  tn: 2202
+  fp: 19
+  fn: 82
+  tp: 22
