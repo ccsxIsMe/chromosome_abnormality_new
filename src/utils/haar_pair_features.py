@@ -19,6 +19,17 @@ class ChromosomeBandRepresentation:
     valid_profile_fraction: float
 
 
+@dataclass
+class StraightenedChromosomeImage:
+    image: np.ndarray
+    mask: np.ndarray
+    major_axis_angle_deg: float
+    foreground_area: int
+    bbox_height: int
+    bbox_width: int
+    valid_profile_fraction: float
+
+
 def moving_average_1d(values: np.ndarray, kernel_size: int = 5) -> np.ndarray:
     values = np.asarray(values, dtype=np.float32)
     if values.size == 0 or kernel_size <= 1:
@@ -293,6 +304,92 @@ def build_centerline_band_image(
     valid_ratios = np.asarray(valid_ratios, dtype=np.float32)
     valid_fraction = float(valid_ratios.mean()) if valid_ratios.size > 0 else 0.0
     return band_image, row_values, width_values, valid_fraction
+
+
+def resample_2d_height_first(image: np.ndarray, target_height: int) -> np.ndarray:
+    image = np.asarray(image, dtype=np.float32)
+    if image.ndim != 2:
+        raise ValueError(f"Expected 2D image, got shape={image.shape}")
+
+    if image.shape[0] == target_height:
+        return image.astype(np.float32)
+
+    columns = [
+        resample_1d(image[:, col_idx], target_height)
+        for col_idx in range(image.shape[1])
+    ]
+    return np.stack(columns, axis=1).astype(np.float32)
+
+
+def _prepare_aligned_crop(gray_image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float]:
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(mask)
+    cropped_image = gray_image[y0:y1, x0:x1]
+    cropped_mask = mask[y0:y1, x0:x1]
+
+    angle_deg = estimate_major_axis_angle(cropped_mask)
+    rotated_image, rotated_mask = rotate_image_and_mask(cropped_image, cropped_mask, angle_deg)
+    if rotated_mask.sum() == 0:
+        rotated_mask = np.ones_like(rotated_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(rotated_mask)
+    aligned_image = rotated_image[y0:y1, x0:x1]
+    aligned_mask = rotated_mask[y0:y1, x0:x1]
+    if aligned_image.size == 0:
+        aligned_image = gray_image.copy()
+        aligned_mask = np.ones_like(gray_image, dtype=bool)
+
+    return aligned_image.astype(np.float32), aligned_mask.astype(bool), float(angle_deg)
+
+
+def extract_straightened_chromosome_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    output_height: int = 300,
+    output_width: int = 96,
+    smooth_kernel_size: int = 5,
+) -> StraightenedChromosomeImage:
+    aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
+
+    band_image_raw, _, _, valid_fraction = build_centerline_band_image(
+        gray_image=aligned_image,
+        mask=aligned_mask,
+        band_width=output_width,
+    )
+    mask_image_raw, _, _, _ = build_centerline_band_image(
+        gray_image=aligned_mask.astype(np.float32),
+        mask=aligned_mask,
+        band_width=output_width,
+    )
+
+    straightened_image = resample_2d_height_first(band_image_raw, output_height)
+    straightened_mask = resample_2d_height_first(mask_image_raw, output_height)
+
+    if smooth_kernel_size > 1 and straightened_image.shape[0] >= smooth_kernel_size:
+        smoothed_cols = [
+            moving_average_1d(straightened_image[:, col_idx], kernel_size=smooth_kernel_size)
+            for col_idx in range(straightened_image.shape[1])
+        ]
+        straightened_image = np.stack(smoothed_cols, axis=1).astype(np.float32)
+
+    straightened_mask = np.clip(straightened_mask, 0.0, 1.0).astype(np.float32)
+    straightened_mask = (straightened_mask > 0.35).astype(np.float32)
+
+    # Keep the background white after unfolding to avoid introducing artificial dark bands.
+    straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+    straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+
+    return StraightenedChromosomeImage(
+        image=straightened_image,
+        mask=straightened_mask,
+        major_axis_angle_deg=float(angle_deg),
+        foreground_area=int(aligned_mask.sum()),
+        bbox_height=int(aligned_mask.shape[0]),
+        bbox_width=int(aligned_mask.shape[1]),
+        valid_profile_fraction=float(valid_fraction),
+    )
 
 
 def _extract_band_profile_v1(
@@ -726,6 +823,23 @@ def extract_single_band_representation_from_path(
         profile_length=profile_length,
         band_width=band_width,
         version=representation_version,
+    )
+
+
+def extract_straightened_chromosome_image_from_path(
+    image_path: str,
+    output_height: int = 300,
+    output_width: int = 96,
+    smooth_kernel_size: int = 5,
+) -> StraightenedChromosomeImage:
+    gray_image = load_grayscale_image(image_path)
+    mask = estimate_foreground_mask(gray_image)
+    return extract_straightened_chromosome_image(
+        gray_image=gray_image,
+        mask=mask,
+        output_height=output_height,
+        output_width=output_width,
+        smooth_kernel_size=smooth_kernel_size,
     )
 
 
