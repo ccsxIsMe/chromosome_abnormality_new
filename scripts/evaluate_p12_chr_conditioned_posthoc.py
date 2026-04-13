@@ -42,6 +42,47 @@ def safe_median_mad(values):
     return median, mad
 
 
+def safe_tail_stats(values, tail_quantile):
+    values = np.asarray(values, dtype=np.float64)
+    tail_threshold = float(np.quantile(values, tail_quantile))
+    tail_values = values[values >= tail_threshold]
+    tail_excess = tail_values - tail_threshold
+    tail_mean_excess = float(tail_excess.mean()) if len(tail_excess) > 0 else 0.0
+    tail_std_excess = float(tail_excess.std()) if len(tail_excess) > 0 else 0.0
+    if tail_std_excess <= 1e-12:
+        tail_std_excess = 1.0
+    return {
+        "tail_quantile": float(tail_quantile),
+        "tail_threshold": tail_threshold,
+        "tail_count": int(len(tail_values)),
+        "tail_mean_excess": tail_mean_excess,
+        "tail_std_excess": tail_std_excess,
+    }
+
+
+def empirical_percentile(raw_score, sorted_scores):
+    sorted_scores = np.asarray(sorted_scores, dtype=np.float64)
+    if sorted_scores.size == 0:
+        return 0.5
+    rank = int(np.searchsorted(sorted_scores, float(raw_score), side="right"))
+    return rank / float(sorted_scores.size)
+
+
+def summarize_normal_distribution(values, tail_quantile):
+    values = np.asarray(values, dtype=np.float64)
+    mean, std = safe_mean_std(values)
+    median, mad = safe_median_mad(values)
+    tail_stats = safe_tail_stats(values, tail_quantile)
+    return {
+        "count": int(len(values)),
+        "mean": mean,
+        "std": std,
+        "median": median,
+        "mad": mad,
+        **tail_stats,
+    }
+
+
 def load_prediction_csv(path):
     df = pd.read_csv(path)
     required_cols = {"label", "anomaly_score", "chromosome_id"}
@@ -63,34 +104,28 @@ def load_prediction_csv(path):
     return df
 
 
-def build_chr_normal_stats(train_df):
+def build_chr_normal_stats(train_df, tail_quantile):
     normal_df = train_df[train_df["label"] == 0].copy()
     if normal_df.empty:
         raise ValueError("Train predictions contain no normal samples.")
 
-    global_mean, global_std = safe_mean_std(normal_df["anomaly_score"].to_numpy())
-    global_median, global_mad = safe_median_mad(normal_df["anomaly_score"].to_numpy())
-    global_stats = {
-        "count": int(len(normal_df)),
-        "mean": global_mean,
-        "std": global_std,
-        "median": global_median,
-        "mad": global_mad,
-    }
+    global_scores = normal_df["anomaly_score"].to_numpy(dtype=np.float64)
+    global_stats = summarize_normal_distribution(global_scores, tail_quantile)
+    global_context = dict(global_stats)
+    global_context["sorted_scores"] = np.sort(global_scores)
 
     chr_stats = {}
+    chr_context = {}
     for chromosome_id, group in normal_df.groupby("chromosome_id"):
-        mean, std = safe_mean_std(group["anomaly_score"].to_numpy())
-        median, mad = safe_median_mad(group["anomaly_score"].to_numpy())
-        chr_stats[str(chromosome_id)] = {
-            "count": int(len(group)),
-            "mean": mean,
-            "std": std,
-            "median": median,
-            "mad": mad,
+        scores = group["anomaly_score"].to_numpy(dtype=np.float64)
+        summary = summarize_normal_distribution(scores, tail_quantile)
+        chr_stats[str(chromosome_id)] = summary
+        chr_context[str(chromosome_id)] = {
+            **summary,
+            "sorted_scores": np.sort(scores),
         }
 
-    return chr_stats, global_stats
+    return chr_stats, global_stats, chr_context, global_context
 
 
 def calibrate_score(raw_score, stats, score_mode):
@@ -101,6 +136,16 @@ def calibrate_score(raw_score, stats, score_mode):
         return (raw_score - float(stats["mean"])) / max(float(stats["std"]), 1e-12)
     if score_mode == "chr_robust_zscore":
         return (raw_score - float(stats["median"])) / max(1.4826 * float(stats["mad"]), 1e-12)
+    if score_mode == "chr_percentile":
+        return empirical_percentile(raw_score, stats["sorted_scores"])
+    if score_mode == "chr_tail_zscore":
+        percentile = empirical_percentile(raw_score, stats["sorted_scores"])
+        tail_threshold = float(stats["tail_threshold"])
+        if raw_score <= tail_threshold:
+            return percentile
+        tail_std_excess = max(float(stats["tail_std_excess"]), 1e-12)
+        tail_quantile = float(stats["tail_quantile"])
+        return tail_quantile + (raw_score - tail_threshold) / tail_std_excess
     raise ValueError(f"Unsupported score_mode: {score_mode}")
 
 
@@ -255,6 +300,7 @@ def summarize_by_subtype(df, pred_column, score_column):
 
 def build_compact_results(
     score_mode,
+    tail_quantile,
     quantiles,
     global_eval,
     chr_eval,
@@ -265,8 +311,9 @@ def build_compact_results(
     calibrated_test_df,
 ):
     return {
-        "method": "p12_chr_conditioned_posthoc",
+        "method": "chromosome_conditioned_posthoc",
         "score_mode": score_mode,
+        "tail_quantile": float(tail_quantile),
         "quantiles": quantiles,
         "global_eval": {
             "val_best_threshold": float(global_eval["val_best_threshold"]),
@@ -421,7 +468,7 @@ def run_chr_threshold_eval(train_df, val_df, test_df, quantiles):
 
 def write_summary_table(output_path, score_mode, global_eval, chr_eval):
     lines = [
-        "# P12 Chromosome-Conditioned Posthoc Summary",
+        "# Chromosome-Conditioned Posthoc Summary",
         "",
         f"- score_mode: `{score_mode}`",
         f"- global val-best threshold: `{global_eval['val_best_threshold']:.6f}`",
@@ -453,8 +500,13 @@ def main():
     parser.add_argument("--val_predictions", required=True)
     parser.add_argument("--test_predictions", required=True)
     parser.add_argument("--output_dir", required=True)
-    parser.add_argument("--score_mode", default="chr_zscore", choices=["raw", "chr_zscore", "chr_robust_zscore"])
+    parser.add_argument(
+        "--score_mode",
+        default="chr_zscore",
+        choices=["raw", "chr_zscore", "chr_robust_zscore", "chr_percentile", "chr_tail_zscore"],
+    )
     parser.add_argument("--quantiles", default="0.95,0.975,0.99")
+    parser.add_argument("--tail_quantile", type=float, default=0.9)
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -464,16 +516,18 @@ def main():
     for quantile in quantiles:
         if not 0.0 < quantile < 1.0:
             raise ValueError(f"Invalid quantile: {quantile}")
+    if not 0.0 < float(args.tail_quantile) < 1.0:
+        raise ValueError(f"Invalid tail_quantile: {args.tail_quantile}")
 
     train_df = load_prediction_csv(args.train_predictions)
     val_df = load_prediction_csv(args.val_predictions)
     test_df = load_prediction_csv(args.test_predictions)
 
-    chr_stats, global_stats = build_chr_normal_stats(train_df)
+    chr_stats, global_stats, chr_context, global_context = build_chr_normal_stats(train_df, args.tail_quantile)
 
-    train_df = apply_chr_calibration(train_df, chr_stats, global_stats, args.score_mode)
-    val_df = apply_chr_calibration(val_df, chr_stats, global_stats, args.score_mode)
-    test_df = apply_chr_calibration(test_df, chr_stats, global_stats, args.score_mode)
+    train_df = apply_chr_calibration(train_df, chr_context, global_context, args.score_mode)
+    val_df = apply_chr_calibration(val_df, chr_context, global_context, args.score_mode)
+    test_df = apply_chr_calibration(test_df, chr_context, global_context, args.score_mode)
 
     global_eval = run_global_threshold_eval(train_df, val_df, test_df, quantiles)
     chr_eval = run_chr_threshold_eval(train_df, val_df, test_df, quantiles)
@@ -509,8 +563,9 @@ def main():
         test_unseen_chr = None
 
     results_full = {
-        "method": "p12_chr_conditioned_posthoc",
+        "method": "chromosome_conditioned_posthoc",
         "score_mode": args.score_mode,
+        "tail_quantile": float(args.tail_quantile),
         "quantiles": quantiles,
         "global_normal_stats": global_stats,
         "chr_normal_stats": chr_stats,
@@ -533,6 +588,7 @@ def main():
     }
     results = build_compact_results(
         score_mode=args.score_mode,
+        tail_quantile=args.tail_quantile,
         quantiles=quantiles,
         global_eval=global_eval,
         chr_eval=chr_eval,
