@@ -112,7 +112,7 @@ def largest_connected_component(binary_mask: np.ndarray) -> np.ndarray:
     return largest
 
 
-def estimate_foreground_mask(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
+def _estimate_foreground_mask_basic(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
     gray_image = np.asarray(gray_image, dtype=np.float32)
     foreground_score = 1.0 - np.clip(gray_image, 0.0, 1.0)
     threshold = otsu_threshold(foreground_score)
@@ -127,6 +127,56 @@ def estimate_foreground_mask(gray_image: np.ndarray, min_area_ratio: float = 0.0
         mask = foreground_score >= float(np.quantile(foreground_score, 0.90))
         mask = largest_connected_component(mask)
     return mask
+
+
+def _estimate_foreground_mask_cv2(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
+    _require_cv2("_estimate_foreground_mask_cv2")
+
+    gray = np.asarray(np.clip(gray_image, 0.0, 1.0) * 255.0, dtype=np.uint8)
+    h, w = gray.shape
+    min_side = max(min(h, w), 1)
+
+    # Blur first so bright/dark bands collapse into a single chromosome body before thresholding.
+    sigma = max(float(min_side) / 32.0, 2.0)
+    kernel = max(int(round(sigma * 4)) * 2 + 1, 9)
+    blurred = cv2.GaussianBlur(gray, (kernel, kernel), sigmaX=sigma, sigmaY=sigma)
+    inverted = 255 - blurred
+
+    _, binary = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    close_size = max((min_side // 24) | 1, 7)
+    close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_size, close_size))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, close_kernel)
+
+    dilate_size = max((min_side // 40) | 1, 3)
+    dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_size, dilate_size))
+    binary = cv2.dilate(binary, dilate_kernel, iterations=1)
+
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return _estimate_foreground_mask_basic(gray_image, min_area_ratio=min_area_ratio)
+
+    largest = max(contours, key=cv2.contourArea)
+    filled = np.zeros_like(binary)
+    cv2.drawContours(filled, [largest], contourIdx=-1, color=255, thickness=-1)
+
+    # One more close step to remove band-induced notches.
+    filled = cv2.morphologyEx(filled, cv2.MORPH_CLOSE, close_kernel)
+    mask = filled > 0
+
+    if mask.mean() < min_area_ratio:
+        return _estimate_foreground_mask_basic(gray_image, min_area_ratio=min_area_ratio)
+
+    return largest_connected_component(mask)
+
+
+def estimate_foreground_mask(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
+    if cv2 is not None:
+        try:
+            return _estimate_foreground_mask_cv2(gray_image, min_area_ratio=min_area_ratio)
+        except Exception:
+            pass
+    return _estimate_foreground_mask_basic(gray_image, min_area_ratio=min_area_ratio)
 
 
 def mask_bounding_box(mask: np.ndarray, margin: int = 4) -> Tuple[int, int, int, int]:
