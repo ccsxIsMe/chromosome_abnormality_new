@@ -35,6 +35,10 @@ def parse_float_list(text):
     return [float(item.strip()) for item in str(text).split(",") if item.strip()]
 
 
+def get_experiment_tag(cfg, config_path):
+    return str(cfg.get("experiment_name") or Path(config_path).stem)
+
+
 def build_model_from_config(cfg, chr_to_idx, device):
     return build_model(
         model_name=cfg["model"]["name"],
@@ -383,9 +387,9 @@ def compute_metrics_from_predictions(y_true, y_score, y_pred):
     return metrics
 
 
-def write_summary_table(output_path, global_eval, chr_eval, distance, knn_k):
+def write_summary_table(output_path, experiment_tag, global_eval, chr_eval, distance, knn_k):
     lines = [
-        "# P12 Embedding Chromosome-Conditioned Memory Bank Summary",
+        f"# Embedding Chromosome-Conditioned Memory Bank Summary ({experiment_tag})",
         "",
         f"- distance: `{distance}`",
         f"- knn_k: `{knn_k}`",
@@ -452,6 +456,7 @@ def main():
     model = build_model_from_config(cfg, chr_to_idx, device)
     _safe_load_state_dict(model, args.ckpt, device)
     model.eval()
+    experiment_tag = get_experiment_tag(cfg, args.config)
 
     save_dir = args.save_dir or default_save_dir(args.config, args.ckpt)
     os.makedirs(save_dir, exist_ok=True)
@@ -603,7 +608,8 @@ def main():
     test_df["used_threshold_chr_conditioned"] = test_used_thresholds.astype(float)
 
     results = {
-        "method": "p12_embedding_chr_memory_bank",
+        "method": "embedding_chr_memory_bank",
+        "experiment_name": experiment_tag,
         "config_path": args.config,
         "checkpoint_path": args.ckpt,
         "distance": args.distance,
@@ -725,6 +731,7 @@ def main():
 
     write_summary_table(
         Path(save_dir) / "summary_table.md",
+        experiment_tag,
         results["global_eval"],
         results["chr_eval"],
         args.distance,
