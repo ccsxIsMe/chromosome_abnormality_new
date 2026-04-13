@@ -76,8 +76,37 @@ def parse_args():
     parser.add_argument(
         "--target_mode",
         default="anomaly_score",
-        choices=["anomaly_score", "pair_distance", "reverse_gain", "direct_mismatch"],
+        choices=[
+            "anomaly_score",
+            "pair_distance",
+            "reverse_gain",
+            "reverse_margin",
+            "direct_mismatch",
+            "corr_delta_l1",
+            "corr_delta_positive",
+        ],
         help="Backprop target for attribution.",
+    )
+    parser.add_argument(
+        "--fallback_target_mode",
+        default="pair_distance",
+        choices=[
+            "none",
+            "anomaly_score",
+            "pair_distance",
+            "reverse_gain",
+            "reverse_margin",
+            "direct_mismatch",
+            "corr_delta_l1",
+            "corr_delta_positive",
+        ],
+        help="Fallback attribution target when the primary target produces near-zero gradients.",
+    )
+    parser.add_argument(
+        "--min_grad_norm",
+        type=float,
+        default=1e-10,
+        help="If both left/right grad norms are below this threshold, retry using fallback_target_mode.",
     )
     parser.add_argument(
         "--cam_mode",
@@ -394,6 +423,9 @@ def build_metadata_text(row, score_column, pred_column, model_output):
         f"reverse_diag_similarity: {float(to_python_scalar(model_output['reverse_diag_similarity'][0])):.6f}"
         if "reverse_diag_similarity" in model_output
         else "",
+        f"used_target_mode: {row.get('_used_target_mode', '')}",
+        f"left_grad_norm: {float(row.get('_left_grad_norm', 0.0)):.6e}",
+        f"right_grad_norm: {float(row.get('_right_grad_norm', 0.0)):.6e}",
         f"profile_pearson_direct: {float(profile_stats.get('pearson_direct', 0.0)):.4f}",
         f"profile_pearson_reverse: {float(profile_stats.get('pearson_reverse', 0.0)):.4f}",
         f"profile_cosine_direct: {float(profile_stats.get('cosine_direct', 0.0)):.4f}",
@@ -511,9 +543,38 @@ def select_attribution_target(model_output, target_mode):
         return model_output["pair_distance"][0]
     if target_mode == "reverse_gain":
         return model_output["reverse_gain"][0]
+    if target_mode == "reverse_margin":
+        return model_output["reverse_diag_similarity"][0] - model_output["direct_diag_similarity"][0]
     if target_mode == "direct_mismatch":
         return 1.0 - model_output["direct_diag_similarity"][0]
+    if target_mode == "corr_delta_l1":
+        return model_output["corr_delta"][0].abs().mean()
+    if target_mode == "corr_delta_positive":
+        return F.relu(model_output["corr_delta"][0]).mean()
     raise ValueError(f"Unsupported target_mode: {target_mode}")
+
+
+def compute_record_grad_norm(record):
+    grad = record.get("grad")
+    if grad is None:
+        return 0.0
+    return float(grad.abs().sum().detach().cpu().item())
+
+
+def run_attribution_backward(model, recorder, left_image, right_image, chr_idx, target_mode):
+    recorder.clear()
+    model.zero_grad(set_to_none=True)
+
+    with torch.enable_grad():
+        if chr_idx is None:
+            model_output = model(left_image, right_image)
+        else:
+            model_output = model(left_image, right_image, chr_idx)
+
+        target = select_attribution_target(model_output, target_mode)
+        target.backward()
+
+    return model_output
 
 
 def visualize_one_sample(
@@ -527,21 +588,39 @@ def visualize_one_sample(
     save_path,
     args,
 ):
-    recorder.clear()
-    model.zero_grad(set_to_none=True)
-
     left_image = sample["left_image"].unsqueeze(0).to(device)
     right_image = sample["right_image"].unsqueeze(0).to(device)
     chr_idx = torch.tensor([int(sample["chr_idx"])], device=device) if "chr_idx" in sample else None
 
-    with torch.enable_grad():
-        if chr_idx is None:
-            model_output = model(left_image, right_image)
-        else:
-            model_output = model(left_image, right_image, chr_idx)
+    used_target_mode = args.target_mode
+    model_output = run_attribution_backward(
+        model=model,
+        recorder=recorder,
+        left_image=left_image,
+        right_image=right_image,
+        chr_idx=chr_idx,
+        target_mode=used_target_mode,
+    )
 
-        target = select_attribution_target(model_output, args.target_mode)
-        target.backward()
+    left_grad_norm = compute_record_grad_norm(recorder.records[0]) if len(recorder.records) > 0 else 0.0
+    right_grad_norm = compute_record_grad_norm(recorder.records[1]) if len(recorder.records) > 1 else 0.0
+    if (
+        args.fallback_target_mode != "none"
+        and len(recorder.records) >= 2
+        and left_grad_norm <= float(args.min_grad_norm)
+        and right_grad_norm <= float(args.min_grad_norm)
+    ):
+        used_target_mode = args.fallback_target_mode
+        model_output = run_attribution_backward(
+            model=model,
+            recorder=recorder,
+            left_image=left_image,
+            right_image=right_image,
+            chr_idx=chr_idx,
+            target_mode=used_target_mode,
+        )
+        left_grad_norm = compute_record_grad_norm(recorder.records[0]) if len(recorder.records) > 0 else 0.0
+        right_grad_norm = compute_record_grad_norm(recorder.records[1]) if len(recorder.records) > 1 else 0.0
 
     if len(recorder.records) < 2:
         raise ValueError(
@@ -587,6 +666,9 @@ def visualize_one_sample(
     )
     row = row.copy()
     row["_profile_stats"] = profile_stats
+    row["_used_target_mode"] = used_target_mode
+    row["_left_grad_norm"] = left_grad_norm
+    row["_right_grad_norm"] = right_grad_norm
     metadata_text = build_metadata_text(row, score_column, pred_column, model_output)
     save_explanation_panel(
         output_path=save_path,
@@ -606,7 +688,7 @@ def visualize_one_sample(
         left_gradcam2d=left_gradcam2d,
         right_gradcam2d=right_gradcam2d,
     )
-    return profile_stats
+    return profile_stats, used_target_mode, left_grad_norm, right_grad_norm
 
 
 def main():
@@ -687,7 +769,7 @@ def main():
             file_stem = f"{batch_index:02d}_{group}_case-{case_id}_pair-{pair_key}".replace("/", "_").replace("\\", "_")
             save_path = save_dir / f"{file_stem}.png"
 
-            profile_stats = visualize_one_sample(
+            profile_stats, used_target_mode, left_grad_norm, right_grad_norm = visualize_one_sample(
                 model=model,
                 recorder=recorder,
                 sample=simple_sample,
@@ -712,6 +794,9 @@ def main():
                     "chromosome_id": str(row.get("chromosome_id", "")),
                     "abnormal_subtype_id": str(row.get("abnormal_subtype_id", "")),
                     "subtype_status": str(row.get("subtype_status", "")),
+                    "used_target_mode": used_target_mode,
+                    "left_grad_norm": float(left_grad_norm),
+                    "right_grad_norm": float(right_grad_norm),
                     "profile_pearson_direct": float(profile_stats["pearson_direct"]),
                     "profile_pearson_reverse": float(profile_stats["pearson_reverse"]),
                     "profile_cosine_direct": float(profile_stats["cosine_direct"]),
@@ -737,6 +822,8 @@ def main():
         f"- groups: `{','.join(groups)}`",
         f"- num_per_group: `{args.num_per_group}`",
         f"- target_mode: `{args.target_mode}`",
+        f"- fallback_target_mode: `{args.fallback_target_mode}`",
+        f"- min_grad_norm: `{args.min_grad_norm}`",
         f"- cam_mode: `{args.cam_mode}`",
         "",
         "Saved files:",
