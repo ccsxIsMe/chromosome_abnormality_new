@@ -112,6 +112,53 @@ def largest_connected_component(binary_mask: np.ndarray) -> np.ndarray:
     return largest
 
 
+def remove_small_connected_components(binary_mask: np.ndarray, min_pixels: int = 8) -> np.ndarray:
+    mask = np.asarray(binary_mask, dtype=bool)
+    min_pixels = max(int(min_pixels), 1)
+    if mask.sum() == 0:
+        return mask
+
+    if cv2 is not None:
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
+        kept = np.zeros_like(mask, dtype=bool)
+        for label_idx in range(1, int(num_labels)):
+            area = int(stats[label_idx, cv2.CC_STAT_AREA])
+            if area >= min_pixels:
+                kept |= labels == label_idx
+        return kept if kept.any() else mask
+
+    height, width = mask.shape
+    visited = np.zeros_like(mask, dtype=bool)
+    kept = np.zeros_like(mask, dtype=bool)
+
+    for y in range(height):
+        for x in range(width):
+            if not mask[y, x] or visited[y, x]:
+                continue
+
+            stack = [(y, x)]
+            visited[y, x] = True
+            component: List[Tuple[int, int]] = []
+            while stack:
+                cy, cx = stack.pop()
+                component.append((cy, cx))
+                y0 = max(cy - 1, 0)
+                y1 = min(cy + 2, height)
+                x0 = max(cx - 1, 0)
+                x1 = min(cx + 2, width)
+                for ny in range(y0, y1):
+                    for nx in range(x0, x1):
+                        if not visited[ny, nx] and mask[ny, nx]:
+                            visited[ny, nx] = True
+                            stack.append((ny, nx))
+
+            if len(component) >= min_pixels:
+                for cy, cx in component:
+                    kept[cy, cx] = True
+
+    return kept if kept.any() else mask
+
+
 def _estimate_foreground_mask_basic(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
     gray_image = np.asarray(gray_image, dtype=np.float32)
     foreground_score = 1.0 - np.clip(gray_image, 0.0, 1.0)
@@ -170,7 +217,48 @@ def _estimate_foreground_mask_cv2(gray_image: np.ndarray, min_area_ratio: float 
     return largest_connected_component(mask)
 
 
-def estimate_foreground_mask(gray_image: np.ndarray, min_area_ratio: float = 0.002) -> np.ndarray:
+def _estimate_foreground_mask_white_bg(
+    gray_image: np.ndarray,
+    white_threshold: float = 254.5 / 255.0,
+    min_component_pixels: int = 8,
+) -> np.ndarray:
+    gray_image = np.asarray(np.clip(gray_image, 0.0, 1.0), dtype=np.float32)
+    mask = gray_image < float(white_threshold)
+    if not mask.any():
+        mask = gray_image < 1.0
+    if not mask.any():
+        return mask.astype(bool)
+
+    if cv2 is not None:
+        mask_uint8 = mask.astype(np.uint8) * 255
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        mask_uint8 = cv2.morphologyEx(mask_uint8, cv2.MORPH_CLOSE, kernel, iterations=1)
+        mask = mask_uint8 > 0
+
+    mask = remove_small_connected_components(mask, min_pixels=min_component_pixels)
+    return mask.astype(bool)
+
+
+def estimate_foreground_mask(
+    gray_image: np.ndarray,
+    min_area_ratio: float = 0.002,
+    mode: str = "auto",
+    white_threshold: float = 254.5 / 255.0,
+) -> np.ndarray:
+    if mode == "white_bg_exact":
+        return _estimate_foreground_mask_white_bg(
+            gray_image=gray_image,
+            white_threshold=white_threshold,
+        )
+    if mode == "basic":
+        return _estimate_foreground_mask_basic(gray_image, min_area_ratio=min_area_ratio)
+    if mode == "cv2":
+        if cv2 is None:
+            return _estimate_foreground_mask_basic(gray_image, min_area_ratio=min_area_ratio)
+        return _estimate_foreground_mask_cv2(gray_image, min_area_ratio=min_area_ratio)
+    if mode != "auto":
+        raise ValueError(f"Unsupported foreground mask mode: {mode}")
+
     if cv2 is not None:
         try:
             return _estimate_foreground_mask_cv2(gray_image, min_area_ratio=min_area_ratio)
@@ -406,7 +494,12 @@ def _prepare_aligned_crop(gray_image: np.ndarray, mask: np.ndarray) -> Tuple[np.
     return aligned_image.astype(np.float32), aligned_mask.astype(bool), float(angle_deg)
 
 
-def repair_vertical_chromosome_mask(mask: np.ndarray, smooth_kernel_size: int = 11) -> np.ndarray:
+def repair_vertical_chromosome_mask(
+    mask: np.ndarray,
+    smooth_kernel_size: int = 11,
+    expand_ratio: float = 0.0,
+    min_expand_pixels: float = 0.0,
+) -> np.ndarray:
     mask = np.asarray(mask, dtype=bool)
     if mask.sum() == 0:
         return mask
@@ -437,7 +530,7 @@ def repair_vertical_chromosome_mask(mask: np.ndarray, smooth_kernel_size: int = 
 
     widths = np.maximum(right_interp - left_interp + 1.0, 1.0)
     median_width = float(np.median(widths[valid_rows])) if valid_rows.size > 0 else 1.0
-    expand = max(1.0, 0.08 * median_width)
+    expand = max(float(min_expand_pixels), float(expand_ratio) * median_width)
 
     repaired = np.zeros_like(mask, dtype=bool)
     start_row = int(valid_rows.min())
@@ -449,6 +542,7 @@ def repair_vertical_chromosome_mask(mask: np.ndarray, smooth_kernel_size: int = 
             repaired[row_idx, left : right + 1] = True
 
     repaired |= mask
+    repaired = remove_small_connected_components(repaired, min_pixels=8)
     return largest_connected_component(repaired)
 
 
@@ -465,6 +559,33 @@ def _resize_gray_image(image: np.ndarray, out_width: int, out_height: int) -> np
     pil_image = Image.fromarray(np.clip(image * 255.0, 0.0, 255.0).astype(np.uint8), mode="L")
     resized = pil_image.resize((int(out_width), int(out_height)), resample=Image.BILINEAR)
     return (np.asarray(resized, dtype=np.float32) / 255.0).astype(np.float32)
+
+
+def _resize_image_and_mask(
+    image: np.ndarray,
+    mask: np.ndarray,
+    output_height: int,
+    output_width: int,
+    resize_mode: str = "fixed",
+) -> Tuple[np.ndarray, np.ndarray]:
+    image = np.asarray(image, dtype=np.float32)
+    mask = np.asarray(mask, dtype=np.float32)
+
+    src_h, src_w = image.shape
+    target_height = max(int(output_height), 1)
+    if resize_mode == "fixed":
+        target_width = max(int(output_width), 1)
+    elif resize_mode == "height_only":
+        scale = float(target_height) / max(float(src_h), 1.0)
+        target_width = max(int(round(float(src_w) * scale)), 1)
+        if int(output_width) > 0:
+            target_width = min(target_width, int(output_width))
+    else:
+        raise ValueError(f"Unsupported resize mode: {resize_mode}")
+
+    resized_image = _resize_gray_image(image, out_width=target_width, out_height=target_height)
+    resized_mask = _resize_gray_image(mask.astype(np.float32), out_width=target_width, out_height=target_height)
+    return resized_image.astype(np.float32), resized_mask.astype(np.float32)
 
 
 def _add_border_gray(gray_image: np.ndarray, value: float = 1.0) -> np.ndarray:
@@ -670,13 +791,18 @@ def extract_projection_split_straightened_image(
     global_angle_step: int = 5,
     local_angle_step: int = 5,
     seam_trim: int = 3,
+    repair_expand_ratio: float = 0.0,
+    resize_mode: str = "fixed",
 ) -> StraightenedChromosomeImage:
     aligned_gray, aligned_mask, global_degree, bend_row, _ = _find_best_global_bend_rotation(
         gray_image=gray_image,
         mask=mask,
         angle_step=global_angle_step,
     )
-    aligned_mask = repair_vertical_chromosome_mask(aligned_mask)
+    aligned_mask = repair_vertical_chromosome_mask(
+        aligned_mask,
+        expand_ratio=repair_expand_ratio,
+    )
 
     if bend_row is None or bend_row <= 2 or bend_row >= aligned_gray.shape[0] - 2:
         return extract_straightened_chromosome_image(
@@ -685,14 +811,23 @@ def extract_projection_split_straightened_image(
             output_height=output_height,
             output_width=output_width,
             smooth_kernel_size=5,
+            method="centerline_unfold",
+            repair_expand_ratio=repair_expand_ratio,
+            resize_mode=resize_mode,
         )
 
     upper_gray = aligned_gray[:bend_row, :]
     lower_gray = aligned_gray[bend_row:, :]
     upper_mask = aligned_mask[:bend_row, :]
     lower_mask = aligned_mask[bend_row:, :]
-    upper_mask = repair_vertical_chromosome_mask(upper_mask)
-    lower_mask = repair_vertical_chromosome_mask(lower_mask)
+    upper_mask = repair_vertical_chromosome_mask(
+        upper_mask,
+        expand_ratio=repair_expand_ratio,
+    )
+    lower_mask = repair_vertical_chromosome_mask(
+        lower_mask,
+        expand_ratio=repair_expand_ratio,
+    )
 
     upper_rot_gray, upper_rot_mask, _ = _find_min_width_rotation(
         gray_image=upper_gray,
@@ -723,9 +858,14 @@ def extract_projection_split_straightened_image(
         sewn_gray = aligned_gray.astype(np.float32)
         sewn_mask = aligned_mask.astype(np.float32)
 
-    straightened_image = _resize_gray_image(sewn_gray, out_width=output_width, out_height=output_height)
-    straightened_mask = _resize_gray_image(sewn_mask.astype(np.float32), out_width=output_width, out_height=output_height)
-    straightened_mask = (straightened_mask > 0.35).astype(np.float32)
+    straightened_image, straightened_mask = _resize_image_and_mask(
+        sewn_gray,
+        sewn_mask.astype(np.float32),
+        output_height=output_height,
+        output_width=output_width,
+        resize_mode=resize_mode,
+    )
+    straightened_mask = (straightened_mask > 0.10).astype(np.float32)
     straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
     straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
 
@@ -751,6 +891,8 @@ def extract_straightened_chromosome_image(
     global_angle_step: int = 5,
     local_angle_step: int = 5,
     seam_trim: int = 3,
+    repair_expand_ratio: float = 0.0,
+    resize_mode: str = "fixed",
 ) -> StraightenedChromosomeImage:
     if method == "projection_split_v1":
         return extract_projection_split_straightened_image(
@@ -761,26 +903,39 @@ def extract_straightened_chromosome_image(
             global_angle_step=global_angle_step,
             local_angle_step=local_angle_step,
             seam_trim=seam_trim,
+            repair_expand_ratio=repair_expand_ratio,
+            resize_mode=resize_mode,
         )
     if method != "centerline_unfold":
         raise ValueError(f"Unsupported straightening method: {method}")
 
     aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
-    aligned_mask = repair_vertical_chromosome_mask(aligned_mask)
+    aligned_mask = repair_vertical_chromosome_mask(
+        aligned_mask,
+        expand_ratio=repair_expand_ratio,
+    )
+
+    band_width = int(output_width) if int(output_width) > 0 else max(int(aligned_mask.shape[1]), 32)
 
     band_image_raw, _, _, valid_fraction = build_centerline_band_image(
         gray_image=aligned_image,
         mask=aligned_mask,
-        band_width=output_width,
+        band_width=band_width,
     )
     mask_image_raw, _, _, _ = build_centerline_band_image(
         gray_image=aligned_mask.astype(np.float32),
         mask=aligned_mask,
-        band_width=output_width,
+        band_width=band_width,
     )
 
     straightened_image = resample_2d_height_first(band_image_raw, output_height)
     straightened_mask = resample_2d_height_first(mask_image_raw, output_height)
+
+    if resize_mode == "fixed":
+        straightened_image = _resize_gray_image(straightened_image, out_width=output_width, out_height=output_height)
+        straightened_mask = _resize_gray_image(straightened_mask, out_width=output_width, out_height=output_height)
+    elif resize_mode != "height_only":
+        raise ValueError(f"Unsupported resize mode: {resize_mode}")
 
     if smooth_kernel_size > 1 and straightened_image.shape[0] >= smooth_kernel_size:
         smoothed_cols = [
@@ -790,7 +945,7 @@ def extract_straightened_chromosome_image(
         straightened_image = np.stack(smoothed_cols, axis=1).astype(np.float32)
 
     straightened_mask = np.clip(straightened_mask, 0.0, 1.0).astype(np.float32)
-    straightened_mask = (straightened_mask > 0.35).astype(np.float32)
+    straightened_mask = (straightened_mask > 0.10).astype(np.float32)
 
     # Keep the background white after unfolding to avoid introducing artificial dark bands.
     straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
@@ -1250,9 +1405,17 @@ def extract_straightened_chromosome_image_from_path(
     global_angle_step: int = 5,
     local_angle_step: int = 5,
     seam_trim: int = 3,
+    mask_mode: str = "auto",
+    white_threshold: float = 254.5 / 255.0,
+    repair_expand_ratio: float = 0.0,
+    resize_mode: str = "fixed",
 ) -> StraightenedChromosomeImage:
     gray_image = load_grayscale_image(image_path)
-    mask = estimate_foreground_mask(gray_image)
+    mask = estimate_foreground_mask(
+        gray_image,
+        mode=mask_mode,
+        white_threshold=white_threshold,
+    )
     return extract_straightened_chromosome_image(
         gray_image=gray_image,
         mask=mask,
@@ -1263,6 +1426,8 @@ def extract_straightened_chromosome_image_from_path(
         global_angle_step=global_angle_step,
         local_angle_step=local_angle_step,
         seam_trim=seam_trim,
+        repair_expand_ratio=repair_expand_ratio,
+        resize_mode=resize_mode,
     )
 
 

@@ -19,12 +19,17 @@ def parse_args():
     parser.add_argument("--output_image_dir", required=True)
     parser.add_argument("--output_report_dir", required=True)
     parser.add_argument("--output_height", type=int, default=300)
-    parser.add_argument("--output_width", type=int, default=160)
+    parser.add_argument(
+        "--output_width",
+        type=int,
+        default=0,
+        help="Used only when resize_mode=fixed, or as an optional width cap when resize_mode=height_only.",
+    )
     parser.add_argument(
         "--canvas_size",
         type=int,
-        default=300,
-        help="If > 0, paste the straightened image onto a white square canvas of this size to avoid later resize distortion.",
+        default=0,
+        help="If > 0, paste the straightened image onto a white square canvas. Default 0 keeps raw aspect ratio output.",
     )
     parser.add_argument("--smooth_kernel_size", type=int, default=5)
     parser.add_argument(
@@ -36,6 +41,30 @@ def parse_args():
     parser.add_argument("--global_angle_step", type=int, default=5)
     parser.add_argument("--local_angle_step", type=int, default=5)
     parser.add_argument("--seam_trim", type=int, default=3)
+    parser.add_argument(
+        "--mask_mode",
+        default="white_bg_exact",
+        choices=["auto", "basic", "cv2", "white_bg_exact"],
+        help="Foreground extraction mode. white_bg_exact keeps every non-pure-white pixel as chromosome.",
+    )
+    parser.add_argument(
+        "--white_threshold",
+        type=float,
+        default=254.5 / 255.0,
+        help="Pixels darker than this value are treated as foreground when mask_mode=white_bg_exact.",
+    )
+    parser.add_argument(
+        "--repair_expand_ratio",
+        type=float,
+        default=0.0,
+        help="Extra horizontal expansion applied during mask repair. Keep 0.0 to avoid artificial widening.",
+    )
+    parser.add_argument(
+        "--resize_mode",
+        default="height_only",
+        choices=["fixed", "height_only"],
+        help="height_only preserves the post-straightening aspect ratio and avoids forced widening.",
+    )
     parser.add_argument(
         "--save_mask_preview",
         action="store_true",
@@ -99,6 +128,10 @@ def process_unique_images(
     global_angle_step,
     local_angle_step,
     seam_trim,
+    mask_mode,
+    white_threshold,
+    repair_expand_ratio,
+    resize_mode,
 ):
     rows = []
     path_map = {}
@@ -114,6 +147,10 @@ def process_unique_images(
             global_angle_step=global_angle_step,
             local_angle_step=local_angle_step,
             seam_trim=seam_trim,
+            mask_mode=mask_mode,
+            white_threshold=white_threshold,
+            repair_expand_ratio=repair_expand_ratio,
+            resize_mode=resize_mode,
         )
         straightened_image = paste_on_square_canvas(
             straightened.image,
@@ -147,6 +184,10 @@ def process_unique_images(
                 "output_width": int(output_width),
                 "canvas_size": int(canvas_size),
                 "straightening_method": str(straightening_method),
+                "mask_mode": str(mask_mode),
+                "white_threshold": float(white_threshold),
+                "repair_expand_ratio": float(repair_expand_ratio),
+                "resize_mode": str(resize_mode),
             }
         )
 
@@ -192,6 +233,10 @@ def write_report(report_dir: Path, args, split_rows, unique_image_count):
         f"- canvas_size: `{args.canvas_size}`",
         f"- smooth_kernel_size: `{args.smooth_kernel_size}`",
         f"- straightening_method: `{args.straightening_method}`",
+        f"- mask_mode: `{args.mask_mode}`",
+        f"- white_threshold: `{args.white_threshold}`",
+        f"- repair_expand_ratio: `{args.repair_expand_ratio}`",
+        f"- resize_mode: `{args.resize_mode}`",
         f"- global_angle_step: `{args.global_angle_step}`",
         f"- local_angle_step: `{args.local_angle_step}`",
         f"- seam_trim: `{args.seam_trim}`",
@@ -235,6 +280,10 @@ def main():
         global_angle_step=args.global_angle_step,
         local_angle_step=args.local_angle_step,
         seam_trim=args.seam_trim,
+        mask_mode=args.mask_mode,
+        white_threshold=args.white_threshold,
+        repair_expand_ratio=args.repair_expand_ratio,
+        resize_mode=args.resize_mode,
     )
 
     train_out = rewrite_pair_csv(train_df, path_map)
