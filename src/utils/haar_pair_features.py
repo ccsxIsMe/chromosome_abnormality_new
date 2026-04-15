@@ -399,6 +399,38 @@ def estimate_centerline_from_mask(mask: np.ndarray) -> Tuple[np.ndarray, np.ndar
     return center_x.astype(np.float32), width_values.astype(np.float32)
 
 
+def estimate_centerline_edges_from_mask(mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    mask = np.asarray(mask, dtype=bool)
+    h, _ = mask.shape
+    left_edges = np.full(h, np.nan, dtype=np.float32)
+    right_edges = np.full(h, np.nan, dtype=np.float32)
+
+    for row_idx in range(h):
+        fg_cols = np.where(mask[row_idx])[0]
+        if fg_cols.size == 0:
+            continue
+        left_edges[row_idx] = float(fg_cols.min())
+        right_edges[row_idx] = float(fg_cols.max())
+
+    valid_rows = np.isfinite(left_edges) & np.isfinite(right_edges)
+    valid_fraction = float(valid_rows.mean()) if h > 0 else 0.0
+    if valid_rows.sum() == 0:
+        center_x = np.full(h, np.nan, dtype=np.float32)
+        widths = np.zeros(h, dtype=np.float32)
+        return center_x, left_edges, right_edges, valid_fraction
+
+    row_axis = np.arange(h, dtype=np.float32)
+    left_interp = np.interp(row_axis, row_axis[valid_rows], left_edges[valid_rows]).astype(np.float32)
+    right_interp = np.interp(row_axis, row_axis[valid_rows], right_edges[valid_rows]).astype(np.float32)
+
+    smooth_kernel = 9 if h >= 9 else max((h // 2) * 2 + 1, 3)
+    left_interp = moving_average_1d(left_interp, kernel_size=smooth_kernel)
+    right_interp = moving_average_1d(right_interp, kernel_size=smooth_kernel)
+    center_x = 0.5 * (left_interp + right_interp)
+    widths = np.maximum(right_interp - left_interp + 1.0, 1.0).astype(np.float32)
+    return center_x.astype(np.float32), left_interp.astype(np.float32), right_interp.astype(np.float32), valid_fraction
+
+
 def build_centerline_band_image(
     gray_image: np.ndarray,
     mask: np.ndarray,
@@ -447,6 +479,57 @@ def build_centerline_band_image(
     valid_ratios = np.asarray(valid_ratios, dtype=np.float32)
     valid_fraction = float(valid_ratios.mean()) if valid_ratios.size > 0 else 0.0
     return band_image, row_values, width_values, valid_fraction
+
+
+def build_centerline_shift_straightened_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    target_width: Optional[int] = None,
+    width_scale: float = 1.10,
+    min_margin: int = 2,
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    gray_image = np.asarray(gray_image, dtype=np.float32)
+    mask = np.asarray(mask, dtype=bool)
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    center_x, left_edges, right_edges, valid_fraction = estimate_centerline_edges_from_mask(mask)
+    valid_rows = np.isfinite(center_x)
+    if valid_rows.sum() == 0:
+        fallback_width = int(target_width) if target_width is not None and int(target_width) > 0 else int(gray_image.shape[1])
+        return gray_image.astype(np.float32), mask.astype(np.float32), 0.0
+
+    widths = np.maximum(right_edges - left_edges + 1.0, 1.0)
+    robust_width = float(np.quantile(widths[valid_rows], 0.95)) if valid_rows.any() else float(gray_image.shape[1])
+    raw_width = int(np.ceil(max(robust_width * float(width_scale), float(np.nanmax(widths[valid_rows])) + 2.0 * float(min_margin))))
+    if target_width is not None and int(target_width) > 0:
+        raw_width = max(raw_width, int(target_width))
+    raw_width = max(raw_width, 8)
+
+    row_indices = np.arange(mask.shape[0], dtype=np.float32)
+    offsets = np.arange(raw_width, dtype=np.float32) - (float(raw_width - 1) / 2.0)
+
+    sampled_rows = []
+    sampled_masks = []
+    mask_float = mask.astype(np.float32)
+    default_fill = float(np.nanmean(gray_image[mask])) if mask.any() else float(np.nanmean(gray_image))
+    if not np.isfinite(default_fill):
+        default_fill = 1.0
+
+    for row_idx in range(mask.shape[0]):
+        sample_y = np.full(raw_width, row_indices[row_idx], dtype=np.float32)
+        sample_x = center_x[row_idx] + offsets
+        sampled_row = bilinear_sample(gray_image, sample_y, sample_x, fill_value=1.0)
+        sampled_mask = bilinear_sample(mask_float, sample_y, sample_x, fill_value=0.0)
+        sampled_rows.append(sampled_row.astype(np.float32))
+        sampled_masks.append(sampled_mask.astype(np.float32))
+
+    straightened_image = np.stack(sampled_rows, axis=0).astype(np.float32)
+    straightened_mask = np.stack(sampled_masks, axis=0).astype(np.float32)
+    straightened_mask = (straightened_mask > 0.10).astype(np.float32)
+    straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+    straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+    return straightened_image, straightened_mask, float(valid_fraction)
 
 
 def _require_cv2(method_name: str):
@@ -906,6 +989,52 @@ def extract_straightened_chromosome_image(
             repair_expand_ratio=repair_expand_ratio,
             resize_mode=resize_mode,
         )
+    if method == "centerline_shift_v1":
+        aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
+        aligned_mask = repair_vertical_chromosome_mask(
+            aligned_mask,
+            expand_ratio=repair_expand_ratio,
+        )
+
+        band_width = int(output_width) if int(output_width) > 0 and resize_mode == "fixed" else None
+        straightened_image, straightened_mask, valid_fraction = build_centerline_shift_straightened_image(
+            gray_image=aligned_image,
+            mask=aligned_mask,
+            target_width=band_width,
+        )
+
+        if output_height > 0 and straightened_image.shape[0] != int(output_height):
+            resized_width = int(output_width) if resize_mode == "fixed" else straightened_image.shape[1]
+            straightened_image, straightened_mask = _resize_image_and_mask(
+                straightened_image,
+                straightened_mask,
+                output_height=output_height,
+                output_width=resized_width,
+                resize_mode="fixed" if resize_mode == "fixed" else "height_only",
+            )
+
+        if smooth_kernel_size > 1 and straightened_image.shape[0] >= smooth_kernel_size:
+            smoothed_cols = [
+                moving_average_1d(straightened_image[:, col_idx], kernel_size=smooth_kernel_size)
+                for col_idx in range(straightened_image.shape[1])
+            ]
+            straightened_image = np.stack(smoothed_cols, axis=1).astype(np.float32)
+
+        straightened_mask = np.clip(straightened_mask, 0.0, 1.0).astype(np.float32)
+        straightened_mask = (straightened_mask > 0.10).astype(np.float32)
+        straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+        straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+
+        return StraightenedChromosomeImage(
+            image=straightened_image,
+            mask=straightened_mask,
+            major_axis_angle_deg=float(angle_deg),
+            foreground_area=int(aligned_mask.sum()),
+            bbox_height=int(aligned_mask.shape[0]),
+            bbox_width=int(aligned_mask.shape[1]),
+            valid_profile_fraction=float(valid_fraction),
+        )
+
     if method != "centerline_unfold":
         raise ValueError(f"Unsupported straightening method: {method}")
 
