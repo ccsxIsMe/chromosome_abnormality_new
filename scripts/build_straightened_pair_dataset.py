@@ -34,9 +34,9 @@ def parse_args():
     parser.add_argument("--smooth_kernel_size", type=int, default=5)
     parser.add_argument(
         "--straightening_method",
-        default="centerline_shift_v1",
-        choices=["centerline_unfold", "centerline_shift_v1", "projection_split_v1"],
-        help="Straightening strategy. centerline_shift_v1 keeps a single continuous chromosome body while flattening lateral bending.",
+        default="skeleton_path_v1",
+        choices=["centerline_unfold", "centerline_shift_v1", "skeleton_path_v1", "projection_split_v1"],
+        help="Straightening strategy. skeleton_path_v1 follows the main skeleton path and is intended for strongly curved chromosomes.",
     )
     parser.add_argument("--global_angle_step", type=int, default=5)
     parser.add_argument("--local_angle_step", type=int, default=5)

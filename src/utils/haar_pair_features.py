@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -429,6 +430,196 @@ def estimate_centerline_edges_from_mask(mask: np.ndarray) -> Tuple[np.ndarray, n
     center_x = 0.5 * (left_interp + right_interp)
     widths = np.maximum(right_interp - left_interp + 1.0, 1.0).astype(np.float32)
     return center_x.astype(np.float32), left_interp.astype(np.float32), right_interp.astype(np.float32), valid_fraction
+
+
+def skeletonize_mask_cv2(mask: np.ndarray) -> np.ndarray:
+    _require_cv2("skeletonize_mask_cv2")
+    mask_uint8 = (np.asarray(mask, dtype=bool).astype(np.uint8)) * 255
+    if cv2.countNonZero(mask_uint8) == 0:
+        return np.zeros_like(mask, dtype=bool)
+
+    skeleton = np.zeros_like(mask_uint8)
+    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+    working = mask_uint8.copy()
+
+    while True:
+        opened = cv2.morphologyEx(working, cv2.MORPH_OPEN, element)
+        temp = cv2.subtract(working, opened)
+        eroded = cv2.erode(working, element)
+        skeleton = cv2.bitwise_or(skeleton, temp)
+        working = eroded
+        if cv2.countNonZero(working) == 0:
+            break
+
+    return (skeleton > 0)
+
+
+def _skeleton_neighbors(coords_set: set, y: int, x: int) -> List[Tuple[int, int]]:
+    neighbors: List[Tuple[int, int]] = []
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dy == 0 and dx == 0:
+                continue
+            neighbor = (y + dy, x + dx)
+            if neighbor in coords_set:
+                neighbors.append(neighbor)
+    return neighbors
+
+
+def extract_skeleton_main_path(mask: np.ndarray) -> Optional[np.ndarray]:
+    skeleton = skeletonize_mask_cv2(mask)
+    skeleton = largest_connected_component(skeleton)
+    coords = np.argwhere(skeleton)
+    if coords.shape[0] < 2:
+        return None
+
+    coords_list = [tuple(int(v) for v in coord) for coord in coords]
+    coords_set = set(coords_list)
+    adjacency: Dict[Tuple[int, int], List[Tuple[Tuple[int, int], float]]] = {}
+    for y, x in coords_list:
+        edges: List[Tuple[Tuple[int, int], float]] = []
+        for ny, nx in _skeleton_neighbors(coords_set, y, x):
+            weight = float(np.hypot(float(ny - y), float(nx - x)))
+            edges.append(((ny, nx), weight))
+        adjacency[(y, x)] = edges
+
+    def farthest_from(start: Tuple[int, int]):
+        dist: Dict[Tuple[int, int], float] = {start: 0.0}
+        prev: Dict[Tuple[int, int], Tuple[int, int]] = {}
+        heap: List[Tuple[float, Tuple[int, int]]] = [(0.0, start)]
+        while heap:
+            cur_dist, node = heapq.heappop(heap)
+            if cur_dist > dist[node] + 1e-6:
+                continue
+            for nxt, weight in adjacency[node]:
+                cand = cur_dist + weight
+                if cand < dist.get(nxt, float("inf")):
+                    dist[nxt] = cand
+                    prev[nxt] = node
+                    heapq.heappush(heap, (cand, nxt))
+        end_node = max(dist.items(), key=lambda item: item[1])[0]
+        return end_node, dist, prev
+
+    start_seed = min(coords_list, key=lambda item: (item[0], item[1]))
+    path_start, _, _ = farthest_from(start_seed)
+    path_end, _, prev = farthest_from(path_start)
+
+    path_nodes: List[Tuple[int, int]] = [path_end]
+    current = path_end
+    while current != path_start:
+        parent = prev.get(current)
+        if parent is None:
+            break
+        path_nodes.append(parent)
+        current = parent
+
+    if len(path_nodes) < 2:
+        return None
+
+    path_nodes.reverse()
+    path_array = np.asarray([[float(x), float(y)] for y, x in path_nodes], dtype=np.float32)
+    return path_array
+
+
+def resample_polyline(points_xy: np.ndarray, num_points: int) -> np.ndarray:
+    points_xy = np.asarray(points_xy, dtype=np.float32)
+    if points_xy.ndim != 2 or points_xy.shape[1] != 2:
+        raise ValueError(f"Expected polyline with shape [N, 2], got {points_xy.shape}")
+    if points_xy.shape[0] == 0:
+        return np.zeros((0, 2), dtype=np.float32)
+    if points_xy.shape[0] == 1 or num_points <= 1:
+        return np.repeat(points_xy[:1], max(int(num_points), 1), axis=0).astype(np.float32)
+
+    deltas = np.diff(points_xy, axis=0)
+    seg_lengths = np.sqrt((deltas ** 2).sum(axis=1))
+    arc_length = np.zeros(points_xy.shape[0], dtype=np.float32)
+    arc_length[1:] = np.cumsum(seg_lengths.astype(np.float32))
+    total_length = float(arc_length[-1])
+    if total_length <= 1e-6:
+        return np.repeat(points_xy[:1], max(int(num_points), 1), axis=0).astype(np.float32)
+
+    sample_s = np.linspace(0.0, total_length, num=max(int(num_points), 2), dtype=np.float32)
+    sample_x = np.interp(sample_s, arc_length, points_xy[:, 0]).astype(np.float32)
+    sample_y = np.interp(sample_s, arc_length, points_xy[:, 1]).astype(np.float32)
+    return np.stack([sample_x, sample_y], axis=1).astype(np.float32)
+
+
+def build_skeleton_path_straightened_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    target_width: Optional[int] = None,
+    width_scale: float = 1.35,
+    min_margin: int = 2,
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    gray_image = np.asarray(gray_image, dtype=np.float32)
+    mask = np.asarray(mask, dtype=bool)
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    path_xy = extract_skeleton_main_path(mask)
+    if path_xy is None or path_xy.shape[0] < 2:
+        return build_centerline_shift_straightened_image(
+            gray_image=gray_image,
+            mask=mask,
+            target_width=target_width,
+            width_scale=width_scale,
+            min_margin=min_margin,
+        )
+
+    smooth_kernel = 9 if path_xy.shape[0] >= 9 else 5
+    path_x = moving_average_1d(path_xy[:, 0], kernel_size=smooth_kernel)
+    path_y = moving_average_1d(path_xy[:, 1], kernel_size=smooth_kernel)
+    smooth_path_xy = np.stack([path_x, path_y], axis=1).astype(np.float32)
+
+    deltas = np.diff(smooth_path_xy, axis=0)
+    seg_lengths = np.sqrt((deltas ** 2).sum(axis=1))
+    total_length = float(seg_lengths.sum())
+    target_height = max(int(round(total_length)) + 1, int(path_xy.shape[0]))
+    sample_path_xy = resample_polyline(smooth_path_xy, num_points=target_height)
+
+    tangent = np.gradient(sample_path_xy, axis=0)
+    tangent_norm = np.sqrt((tangent ** 2).sum(axis=1, keepdims=True))
+    tangent_norm = np.maximum(tangent_norm, 1e-6)
+    tangent = tangent / tangent_norm
+    normal = np.stack([-tangent[:, 1], tangent[:, 0]], axis=1).astype(np.float32)
+
+    distance_map = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 5).astype(np.float32)
+    sample_radius = bilinear_sample(
+        distance_map,
+        sample_path_xy[:, 1],
+        sample_path_xy[:, 0],
+        fill_value=0.0,
+    )
+    sample_radius = np.maximum(sample_radius.astype(np.float32), 1.5)
+    robust_radius = float(np.quantile(sample_radius, 0.95)) if sample_radius.size > 0 else 4.0
+    raw_width = int(np.ceil(max(2.0 * robust_radius * float(width_scale) + 2.0 * float(min_margin), 8.0)))
+    if target_width is not None and int(target_width) > 0:
+        raw_width = max(raw_width, int(target_width))
+
+    offsets = np.arange(raw_width, dtype=np.float32) - (float(raw_width - 1) / 2.0)
+    sampled_rows = []
+    sampled_masks = []
+    mask_float = mask.astype(np.float32)
+    valid_ratios = []
+
+    for idx in range(sample_path_xy.shape[0]):
+        half_extent = max(float(sample_radius[idx]) * float(width_scale), float(raw_width) / 2.5)
+        scaled_offsets = offsets * (half_extent / max(float(raw_width) / 2.0, 1e-6))
+        sample_x = sample_path_xy[idx, 0] + scaled_offsets * normal[idx, 0]
+        sample_y = sample_path_xy[idx, 1] + scaled_offsets * normal[idx, 1]
+        sampled_row = bilinear_sample(gray_image, sample_y, sample_x, fill_value=1.0)
+        sampled_mask = bilinear_sample(mask_float, sample_y, sample_x, fill_value=0.0)
+        sampled_rows.append(sampled_row.astype(np.float32))
+        sampled_masks.append(sampled_mask.astype(np.float32))
+        valid_ratios.append(float((sampled_mask > 0.5).mean()))
+
+    straightened_image = np.stack(sampled_rows, axis=0).astype(np.float32)
+    straightened_mask = np.stack(sampled_masks, axis=0).astype(np.float32)
+    straightened_mask = (straightened_mask > 0.10).astype(np.float32)
+    straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+    straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+    valid_fraction = float(np.mean(valid_ratios)) if valid_ratios else 0.0
+    return straightened_image, straightened_mask, valid_fraction
 
 
 def build_centerline_band_image(
@@ -1021,6 +1212,52 @@ def extract_straightened_chromosome_image(
             seam_trim=seam_trim,
             repair_expand_ratio=repair_expand_ratio,
             resize_mode=resize_mode,
+        )
+    if method == "skeleton_path_v1":
+        aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
+        aligned_mask = repair_vertical_chromosome_mask(
+            aligned_mask,
+            expand_ratio=repair_expand_ratio,
+        )
+
+        band_width = int(output_width) if int(output_width) > 0 and resize_mode == "fixed" else None
+        straightened_image, straightened_mask, valid_fraction = build_skeleton_path_straightened_image(
+            gray_image=aligned_image,
+            mask=aligned_mask,
+            target_width=band_width,
+        )
+
+        if output_height > 0 and straightened_image.shape[0] != int(output_height):
+            resized_width = int(output_width) if resize_mode == "fixed" else straightened_image.shape[1]
+            straightened_image, straightened_mask = _resize_image_and_mask(
+                straightened_image,
+                straightened_mask,
+                output_height=output_height,
+                output_width=resized_width,
+                resize_mode="fixed" if resize_mode == "fixed" else "height_only",
+            )
+
+        effective_smooth_kernel = min(int(smooth_kernel_size), 3)
+        if effective_smooth_kernel > 1 and straightened_image.shape[0] >= effective_smooth_kernel:
+            smoothed_cols = [
+                moving_average_1d(straightened_image[:, col_idx], kernel_size=effective_smooth_kernel)
+                for col_idx in range(straightened_image.shape[1])
+            ]
+            straightened_image = np.stack(smoothed_cols, axis=1).astype(np.float32)
+
+        straightened_mask = np.clip(straightened_mask, 0.0, 1.0).astype(np.float32)
+        straightened_mask = (straightened_mask > 0.10).astype(np.float32)
+        straightened_image = np.where(straightened_mask > 0.5, straightened_image, 1.0).astype(np.float32)
+        straightened_image = np.clip(straightened_image, 0.0, 1.0).astype(np.float32)
+
+        return StraightenedChromosomeImage(
+            image=straightened_image,
+            mask=straightened_mask,
+            major_axis_angle_deg=float(angle_deg),
+            foreground_area=int(aligned_mask.sum()),
+            bbox_height=int(aligned_mask.shape[0]),
+            bbox_width=int(aligned_mask.shape[1]),
+            valid_profile_fraction=float(valid_fraction),
         )
     if method == "centerline_shift_v1":
         aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
