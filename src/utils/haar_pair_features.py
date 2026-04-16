@@ -496,29 +496,62 @@ def build_centerline_shift_straightened_image(
     center_x, left_edges, right_edges, valid_fraction = estimate_centerline_edges_from_mask(mask)
     valid_rows = np.isfinite(center_x)
     if valid_rows.sum() == 0:
-        fallback_width = int(target_width) if target_width is not None and int(target_width) > 0 else int(gray_image.shape[1])
         return gray_image.astype(np.float32), mask.astype(np.float32), 0.0
 
     widths = np.maximum(right_edges - left_edges + 1.0, 1.0)
     robust_width = float(np.quantile(widths[valid_rows], 0.95)) if valid_rows.any() else float(gray_image.shape[1])
-    raw_width = int(np.ceil(max(robust_width * float(width_scale), float(np.nanmax(widths[valid_rows])) + 2.0 * float(min_margin))))
+    raw_width = int(
+        np.ceil(
+            max(
+                robust_width * float(width_scale),
+                float(np.nanmax(widths[valid_rows])) + 2.0 * float(min_margin),
+            )
+        )
+    )
     if target_width is not None and int(target_width) > 0:
         raw_width = max(raw_width, int(target_width))
     raw_width = max(raw_width, 8)
 
     row_indices = np.arange(mask.shape[0], dtype=np.float32)
+    centerline_x = moving_average_1d(center_x.astype(np.float32), kernel_size=11 if mask.shape[0] >= 11 else 5)
+    centerline_y = row_indices.astype(np.float32)
+    widths_smooth = moving_average_1d(widths.astype(np.float32), kernel_size=11 if mask.shape[0] >= 11 else 5)
+
+    diff_x = np.diff(centerline_x)
+    diff_y = np.diff(centerline_y)
+    step_lengths = np.sqrt(diff_x ** 2 + diff_y ** 2)
+    arc_length = np.zeros(mask.shape[0], dtype=np.float32)
+    if step_lengths.size > 0:
+        arc_length[1:] = np.cumsum(step_lengths.astype(np.float32))
+
+    total_length = float(arc_length[-1]) if arc_length.size > 0 else 0.0
+    target_height = max(int(round(total_length)) + 1, int(mask.shape[0]))
+    sample_s = np.linspace(0.0, total_length, num=target_height, dtype=np.float32) if total_length > 0 else row_indices
+
+    sample_center_x = np.interp(sample_s, arc_length, centerline_x).astype(np.float32)
+    sample_center_y = np.interp(sample_s, arc_length, centerline_y).astype(np.float32)
+    sample_widths = np.interp(sample_s, arc_length, widths_smooth).astype(np.float32)
+
+    tangent_x = np.gradient(sample_center_x.astype(np.float32))
+    tangent_y = np.gradient(sample_center_y.astype(np.float32))
+    tangent_norm = np.sqrt(tangent_x ** 2 + tangent_y ** 2)
+    tangent_norm = np.maximum(tangent_norm, 1e-6)
+    tangent_x = tangent_x / tangent_norm
+    tangent_y = tangent_y / tangent_norm
+
+    normal_x = -tangent_y
+    normal_y = tangent_x
+
     offsets = np.arange(raw_width, dtype=np.float32) - (float(raw_width - 1) / 2.0)
 
     sampled_rows = []
     sampled_masks = []
     mask_float = mask.astype(np.float32)
-    default_fill = float(np.nanmean(gray_image[mask])) if mask.any() else float(np.nanmean(gray_image))
-    if not np.isfinite(default_fill):
-        default_fill = 1.0
-
-    for row_idx in range(mask.shape[0]):
-        sample_y = np.full(raw_width, row_indices[row_idx], dtype=np.float32)
-        sample_x = center_x[row_idx] + offsets
+    for sample_idx in range(sample_center_x.size):
+        half_extent = max(float(sample_widths[sample_idx]) * 0.55, float(raw_width) / 2.0)
+        scaled_offsets = offsets * (half_extent / max(float(raw_width) / 2.0, 1e-6))
+        sample_x = sample_center_x[sample_idx] + scaled_offsets * normal_x[sample_idx]
+        sample_y = sample_center_y[sample_idx] + scaled_offsets * normal_y[sample_idx]
         sampled_row = bilinear_sample(gray_image, sample_y, sample_x, fill_value=1.0)
         sampled_mask = bilinear_sample(mask_float, sample_y, sample_x, fill_value=0.0)
         sampled_rows.append(sampled_row.astype(np.float32))
@@ -1013,9 +1046,10 @@ def extract_straightened_chromosome_image(
                 resize_mode="fixed" if resize_mode == "fixed" else "height_only",
             )
 
-        if smooth_kernel_size > 1 and straightened_image.shape[0] >= smooth_kernel_size:
+        effective_smooth_kernel = min(int(smooth_kernel_size), 3)
+        if effective_smooth_kernel > 1 and straightened_image.shape[0] >= effective_smooth_kernel:
             smoothed_cols = [
-                moving_average_1d(straightened_image[:, col_idx], kernel_size=smooth_kernel_size)
+                moving_average_1d(straightened_image[:, col_idx], kernel_size=effective_smooth_kernel)
                 for col_idx in range(straightened_image.shape[1])
             ]
             straightened_image = np.stack(smoothed_cols, axis=1).astype(np.float32)
