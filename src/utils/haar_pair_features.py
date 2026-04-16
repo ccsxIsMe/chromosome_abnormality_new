@@ -853,6 +853,29 @@ def repair_vertical_chromosome_mask(
     return largest_connected_component(repaired)
 
 
+def refine_mask_preserve_geometry(mask: np.ndarray, close_kernel_size: int = 3) -> np.ndarray:
+    mask = np.asarray(mask, dtype=bool)
+    if mask.sum() == 0:
+        return mask
+
+    refined = remove_small_connected_components(mask, min_pixels=8)
+    refined = largest_connected_component(refined)
+
+    if cv2 is not None and int(close_kernel_size) > 1:
+        kernel_size = max(int(close_kernel_size) | 1, 3)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        refined_uint8 = cv2.morphologyEx(
+            refined.astype(np.uint8) * 255,
+            cv2.MORPH_CLOSE,
+            kernel,
+            iterations=1,
+        )
+        refined = refined_uint8 > 0
+        refined = largest_connected_component(refined)
+
+    return refined.astype(bool)
+
+
 def _resize_gray_image(image: np.ndarray, out_width: int, out_height: int) -> np.ndarray:
     image = np.asarray(image, dtype=np.float32)
     if cv2 is not None:
@@ -1215,10 +1238,7 @@ def extract_straightened_chromosome_image(
         )
     if method == "skeleton_path_v1":
         aligned_image, aligned_mask, angle_deg = _prepare_aligned_crop(gray_image, mask)
-        aligned_mask = repair_vertical_chromosome_mask(
-            aligned_mask,
-            expand_ratio=repair_expand_ratio,
-        )
+        aligned_mask = refine_mask_preserve_geometry(aligned_mask, close_kernel_size=3)
 
         band_width = int(output_width) if int(output_width) > 0 and resize_mode == "fixed" else None
         straightened_image, straightened_mask, valid_fraction = build_skeleton_path_straightened_image(
