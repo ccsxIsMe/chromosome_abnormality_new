@@ -622,6 +622,135 @@ def build_skeleton_path_straightened_image(
     return straightened_image, straightened_mask, valid_fraction
 
 
+def _safe_odd_kernel_size(length: int, desired: int, minimum: int = 3) -> int:
+    length = int(length)
+    if length <= 1:
+        return 1
+    upper = length if length % 2 == 1 else length - 1
+    upper = max(upper, 1)
+    desired = min(int(desired), upper)
+    if desired % 2 == 0:
+        desired = max(desired - 1, 1)
+    minimum = min(int(minimum), upper)
+    if minimum % 2 == 0:
+        minimum = max(minimum - 1, 1)
+    return max(desired, minimum)
+
+
+def nonlinear_band_enhance_1d(values: np.ndarray, fine_kernel: int = 5, coarse_kernel: int = 21) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float32)
+    if values.size == 0:
+        return values.astype(np.float32)
+
+    fine_kernel = _safe_odd_kernel_size(values.size, fine_kernel, minimum=1)
+    coarse_kernel = _safe_odd_kernel_size(values.size, coarse_kernel, minimum=max(fine_kernel, 3))
+    coarse = moving_average_1d(values, kernel_size=coarse_kernel)
+    detail = values - coarse
+    if fine_kernel > 1:
+        detail = moving_average_1d(detail, kernel_size=fine_kernel)
+
+    local_var = moving_average_1d(detail ** 2, kernel_size=coarse_kernel)
+    scale = np.sqrt(np.maximum(local_var, 1e-6))
+    enhanced = detail / scale
+    enhanced = (enhanced - enhanced.mean()) / max(float(enhanced.std()), 1e-6)
+    return enhanced.astype(np.float32)
+
+
+def nonlinear_band_enhance_2d(band_image: np.ndarray, fine_kernel: int = 5, coarse_kernel: int = 21) -> np.ndarray:
+    band_image = np.asarray(band_image, dtype=np.float32)
+    if band_image.ndim != 2:
+        raise ValueError(f"Expected 2D band image, got shape={band_image.shape}")
+    if band_image.size == 0:
+        return band_image.astype(np.float32)
+
+    enhanced_cols = [
+        nonlinear_band_enhance_1d(band_image[:, col_idx], fine_kernel=fine_kernel, coarse_kernel=coarse_kernel)
+        for col_idx in range(band_image.shape[1])
+    ]
+    enhanced = np.stack(enhanced_cols, axis=1).astype(np.float32)
+    enhanced = enhanced - enhanced.mean(axis=1, keepdims=True)
+    enhanced = (enhanced - enhanced.mean()) / max(float(enhanced.std()), 1e-6)
+    return enhanced.astype(np.float32)
+
+
+def build_skeleton_density_band_image(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    band_width: int,
+    width_scale: float = 1.20,
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray], float]:
+    gray_image = np.asarray(gray_image, dtype=np.float32)
+    mask = np.asarray(mask, dtype=bool)
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    if cv2 is None:
+        return None, None, None, 0.0
+
+    path_xy = extract_skeleton_main_path(mask)
+    if path_xy is None or path_xy.shape[0] < 2:
+        return None, None, None, 0.0
+
+    smooth_kernel = _safe_odd_kernel_size(path_xy.shape[0], desired=9, minimum=3)
+    path_x = moving_average_1d(path_xy[:, 0], kernel_size=smooth_kernel)
+    path_y = moving_average_1d(path_xy[:, 1], kernel_size=smooth_kernel)
+    smooth_path_xy = np.stack([path_x, path_y], axis=1).astype(np.float32)
+
+    deltas = np.diff(smooth_path_xy, axis=0)
+    seg_lengths = np.sqrt((deltas ** 2).sum(axis=1))
+    total_length = float(seg_lengths.sum())
+    target_height = max(int(round(total_length)) + 1, int(path_xy.shape[0]), 8)
+    sample_path_xy = resample_polyline(smooth_path_xy, num_points=target_height)
+
+    tangent = np.gradient(sample_path_xy, axis=0)
+    tangent_norm = np.sqrt((tangent ** 2).sum(axis=1, keepdims=True))
+    tangent_norm = np.maximum(tangent_norm, 1e-6)
+    tangent = tangent / tangent_norm
+    normal = np.stack([-tangent[:, 1], tangent[:, 0]], axis=1).astype(np.float32)
+
+    distance_map = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 5).astype(np.float32)
+    sample_radius = bilinear_sample(
+        distance_map,
+        sample_path_xy[:, 1],
+        sample_path_xy[:, 0],
+        fill_value=0.0,
+    )
+    sample_radius = np.maximum(sample_radius.astype(np.float32), 1.5)
+
+    offsets = np.linspace(-1.0, 1.0, num=int(band_width), dtype=np.float32)
+    mask_float = mask.astype(np.float32)
+    band_rows = []
+    density_profile = []
+    width_values = []
+    valid_ratios = []
+
+    for idx in range(sample_path_xy.shape[0]):
+        half_extent = max(float(sample_radius[idx]) * float(width_scale), 2.0)
+        sample_x = sample_path_xy[idx, 0] + offsets * half_extent * normal[idx, 0]
+        sample_y = sample_path_xy[idx, 1] + offsets * half_extent * normal[idx, 1]
+        sampled_pixels = bilinear_sample(gray_image, sample_y, sample_x, fill_value=1.0)
+        sampled_mask = bilinear_sample(mask_float, sample_y, sample_x, fill_value=0.0)
+        valid_mask = sampled_mask > 0.5
+
+        density_strip = 1.0 - sampled_pixels
+        density_strip = np.where(valid_mask, density_strip, 0.0).astype(np.float32)
+        if valid_mask.any():
+            density_profile.append(float(np.median(density_strip[valid_mask])))
+            valid_ratios.append(float(valid_mask.mean()))
+        else:
+            density_profile.append(0.0)
+            valid_ratios.append(0.0)
+
+        band_rows.append(density_strip.astype(np.float32))
+        width_values.append(float(sample_radius[idx] * 2.0))
+
+    band_image = np.stack(band_rows, axis=0).astype(np.float32)
+    density_profile = np.asarray(density_profile, dtype=np.float32)
+    width_values = np.asarray(width_values, dtype=np.float32)
+    valid_fraction = float(np.mean(valid_ratios)) if valid_ratios else 0.0
+    return band_image, density_profile, width_values, valid_fraction
+
+
 def build_centerline_band_image(
     gray_image: np.ndarray,
     mask: np.ndarray,
@@ -1531,6 +1660,74 @@ def _extract_band_profile_v2(
     )
 
 
+def _extract_band_profile_v3(
+    gray_image: np.ndarray,
+    mask: np.ndarray,
+    profile_length: int = 128,
+    band_width: int = 32,
+) -> ChromosomeBandRepresentation:
+    if mask.sum() == 0:
+        mask = np.ones_like(gray_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(mask)
+    cropped_image = gray_image[y0:y1, x0:x1]
+    cropped_mask = mask[y0:y1, x0:x1]
+
+    angle_deg = estimate_major_axis_angle(cropped_mask)
+    rotated_image, rotated_mask = rotate_image_and_mask(cropped_image, cropped_mask, angle_deg)
+    if rotated_mask.sum() == 0:
+        rotated_mask = np.ones_like(rotated_image, dtype=bool)
+
+    y0, y1, x0, x1 = mask_bounding_box(rotated_mask)
+    aligned_image = rotated_image[y0:y1, x0:x1]
+    aligned_mask = rotated_mask[y0:y1, x0:x1]
+    if aligned_image.size == 0:
+        aligned_image = gray_image.copy()
+        aligned_mask = np.ones_like(gray_image, dtype=bool)
+
+    aligned_mask = refine_mask_preserve_geometry(aligned_mask, close_kernel_size=3)
+    band_image_raw, density_profile_raw, width_values_raw, valid_fraction = build_skeleton_density_band_image(
+        gray_image=aligned_image,
+        mask=aligned_mask,
+        band_width=band_width,
+        width_scale=1.20,
+    )
+    if band_image_raw is None or density_profile_raw is None or width_values_raw is None:
+        return _extract_band_profile_v2(
+            gray_image=gray_image,
+            mask=mask,
+            profile_length=profile_length,
+            band_width=band_width,
+        )
+
+    profile = resample_1d(density_profile_raw, profile_length)
+    width_profile = resample_1d(width_values_raw, profile_length)
+    band_image = np.stack(
+        [resample_1d(band_image_raw[:, col_idx], profile_length) for col_idx in range(band_image_raw.shape[1])],
+        axis=1,
+    ).astype(np.float32)
+
+    profile = nonlinear_band_enhance_1d(profile, fine_kernel=5, coarse_kernel=21)
+    band_image = nonlinear_band_enhance_2d(band_image, fine_kernel=5, coarse_kernel=21)
+    width_profile = moving_average_1d(
+        width_profile,
+        kernel_size=_safe_odd_kernel_size(width_profile.size, desired=7, minimum=3),
+    )
+    if width_profile.std() > 1e-6:
+        width_profile = (width_profile - width_profile.mean()) / max(float(width_profile.std()), 1e-6)
+
+    return ChromosomeBandRepresentation(
+        profile=profile.astype(np.float32),
+        width_profile=width_profile.astype(np.float32),
+        band_image=band_image.astype(np.float32),
+        major_axis_angle_deg=float(angle_deg),
+        foreground_area=int(aligned_mask.sum()),
+        bbox_height=int(aligned_mask.shape[0]),
+        bbox_width=int(aligned_mask.shape[1]),
+        valid_profile_fraction=float(valid_fraction),
+    )
+
+
 def extract_band_profile(
     gray_image: np.ndarray,
     mask: np.ndarray,
@@ -1547,6 +1744,13 @@ def extract_band_profile(
         )
     if version == "v2":
         return _extract_band_profile_v2(
+            gray_image=gray_image,
+            mask=mask,
+            profile_length=profile_length,
+            band_width=band_width,
+        )
+    if version == "v3":
+        return _extract_band_profile_v3(
             gray_image=gray_image,
             mask=mask,
             profile_length=profile_length,

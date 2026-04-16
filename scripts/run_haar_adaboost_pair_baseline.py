@@ -183,7 +183,7 @@ def main():
     parser.add_argument("--profile_length", type=int, default=128)
     parser.add_argument("--band_width", type=int, default=32)
     parser.add_argument("--kernel_sizes", default="4,8,16,32,64")
-    parser.add_argument("--representation_version", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--representation_version", default="v1", choices=["v1", "v2", "v3"])
     parser.add_argument("--pair_orientation_align", action="store_true")
     parser.add_argument("--n_estimators", type=int, default=200)
     parser.add_argument("--learning_rate", type=float, default=0.5)

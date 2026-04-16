@@ -307,7 +307,11 @@ def main():
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--profile_length", type=int, default=128)
     parser.add_argument("--band_width", type=int, default=32)
-    parser.add_argument("--representation_version", default="v2")
+    parser.add_argument(
+        "--representation_version",
+        default="v2",
+        help="Band representation version. v3 adds a BR-ChromNet-style density-profile + skeleton-path band image.",
+    )
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=0)
