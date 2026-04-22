@@ -182,10 +182,9 @@ def collect_model_feature_dataframe(
                             value = str(value)
                         row[key] = value
 
-                if anomaly_scores is not None:
-                    row["p16_anomaly_score"] = float(anomaly_scores[idx].detach().cpu().item())
-
                 if include_model_scalars:
+                    if anomaly_scores is not None:
+                        row["p16_anomaly_score"] = float(anomaly_scores[idx].detach().cpu().item())
                     if pair_distance is not None:
                         row["p16_pair_distance"] = float(pair_distance[idx].detach().cpu().item())
                     if direct_diag is not None:
