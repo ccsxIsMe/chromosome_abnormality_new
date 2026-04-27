@@ -1,3 +1,4 @@
+
 """
 Batch driver for chromosome straightening.
 
@@ -17,17 +18,17 @@ Output layout (mirrors the input):
         straightened/
             train/<case_id>/<normal|abnormal>/<filename>.png
         debug/
-            train/<case_id>/<normal|abnormal>/<filename>.png   (multi-panel debug figure)
-        failures.log   (list of images that failed, with error messages)
+            train/<case_id>/<normal|abnormal>/<filename>.png
+        failures.log
 
 Usage:
     python run_batch.py --input-root /path/to/splits-case \
                         --output-root /path/to/out \
-                        --limit 20            # only process first 20 images (testing)
-                        --limit 0             # 0 or negative = process all
-                        --splits test         # or: train val test (space separated)
-                        --save-debug          # save multi-panel debug figures
-                        --workers 1           # parallel workers
+                        --limit 20 \
+                        --splits test \
+                        --centerline-method contour_pairing_v2 \
+                        --save-debug \
+                        --workers 1
 """
 
 from __future__ import annotations
@@ -44,14 +45,7 @@ from straighten import StraightenConfig, straighten_chromosome
 from visualize import save_debug_figure, save_straightened_png
 
 
-# ---------------------------------------------------------------------------
-# File discovery
-# ---------------------------------------------------------------------------
 def find_images(input_root: str, splits: List[str]) -> List[Tuple[str, str]]:
-    """
-    Returns a list of (abs_input_path, relative_path_from_input_root).
-    We only look for .png files under <split>/<case>/<normal|abnormal>/.
-    """
     results = []
     for split in splits:
         split_dir = os.path.join(input_root, split)
@@ -65,39 +59,31 @@ def find_images(input_root: str, splits: List[str]) -> List[Tuple[str, str]]:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Worker
-# ---------------------------------------------------------------------------
 def process_one(
     input_path: str,
     rel_path: str,
     output_root: str,
     save_debug: bool,
     cfg_dict: dict,
-) -> Tuple[str, bool, str]:
-    """
-    Process a single image. Returns (rel_path, success, error_message).
-    cfg_dict is passed instead of a dataclass for pickle-friendliness.
-    """
+) -> Tuple[str, bool, str, str]:
     try:
         cfg = StraightenConfig(**cfg_dict)
         res = straighten_chromosome(input_path, cfg)
-
         straight_path = os.path.join(output_root, "straightened", rel_path)
         save_straightened_png(res.straightened, straight_path)
-
         if save_debug:
             debug_path = os.path.join(output_root, "debug", rel_path)
             save_debug_figure(res, debug_path, title=rel_path)
-
-        return (rel_path, True, "")
+        return (rel_path, True, "", res.method_used)
     except Exception as e:
-        return (rel_path, False, f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+        return (
+            rel_path,
+            False,
+            f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
+            "",
+        )
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input-root", required=True,
@@ -113,21 +99,59 @@ def main():
     ap.add_argument("--workers", type=int, default=1,
                     help="Parallel worker processes. 1 = serial.")
 
-    # Algorithm parameters (expose the common ones)
-    ap.add_argument("--binary-threshold", type=int, default=240)
-    ap.add_argument("--min-object-size", type=int, default=50)
+    ap.add_argument("--bg-threshold", type=int, default=250,
+                    help="Background threshold: pixels >= this are treated as white background.")
+    ap.add_argument("--min-object-size", type=int, default=80)
+    ap.add_argument("--centerline-method", default="auto",
+                    choices=[
+                        "auto",
+                        "contour_pairing_v2",
+                        "contour_pairing",
+                        "pca_slices",
+                        "medial_axis_pca",
+                    ],
+                    help="Centerline extraction method")
+    ap.add_argument("--auto-bend-ratio", type=float, default=0.18,
+                    help="Kept for backward compatibility")
+    ap.add_argument("--contour-n-samples", type=int, default=200)
+    ap.add_argument("--contour-smooth-sigma", type=float, default=2.0)
+    ap.add_argument("--contour-end-band-frac", type=float, default=0.08)
+    ap.add_argument("--contour-cross-align-thresh", type=float, default=0.55)
+    ap.add_argument("--endpoint-tangent-pts", type=int, default=10)
+    ap.add_argument("--min-cap-points", type=int, default=8)
     ap.add_argument("--normal-half-width", type=int, default=40)
+    ap.add_argument("--endpoint-extend", type=int, default=12)
     ap.add_argument("--spline-smoothing", type=float, default=-1.0,
                     help="Negative = auto")
+    ap.add_argument("--spline-smoothing-scale", type=float, default=3.0,
+                    help="Higher -> straighter centerline (auto smoothing only).")
+    ap.add_argument("--canvas-size", type=int, default=300,
+                    help="Output canvas size (square). 0 = no canvas, output raw.")
     args = ap.parse_args()
 
+    canvas = None if args.canvas_size <= 0 else (args.canvas_size, args.canvas_size)
+
     cfg_dict = dict(
-        binary_threshold=args.binary_threshold,
+        bg_threshold=args.bg_threshold,
         min_object_size=args.min_object_size,
+        centerline_method=args.centerline_method,
+        auto_bend_ratio=args.auto_bend_ratio,
+        contour_n_samples=args.contour_n_samples,
+        contour_smooth_sigma=args.contour_smooth_sigma,
+        contour_end_band_frac=args.contour_end_band_frac,
+        contour_cross_align_thresh=args.contour_cross_align_thresh,
+        endpoint_tangent_pts=args.endpoint_tangent_pts,
+        min_cap_points=args.min_cap_points,
         normal_half_width=args.normal_half_width,
+        endpoint_extend=args.endpoint_extend,
         spline_smoothing=(None if args.spline_smoothing < 0 else args.spline_smoothing),
+        spline_smoothing_scale=args.spline_smoothing_scale,
+        output_canvas_size=canvas,
     )
 
+    from visualize import VIS_VERSION
+    print(f"[info] visualize module version: {VIS_VERSION}")
+    print(f"[info] centerline_method={args.centerline_method}")
     print(f"[info] scanning {args.input_root} for splits={args.splits}")
     items = find_images(args.input_root, args.splits)
     print(f"[info] found {len(items)} images total")
@@ -141,13 +165,13 @@ def main():
     failures = []
 
     if args.workers <= 1:
-        # Serial: easier to debug
         for i, (inp, rel) in enumerate(items, 1):
-            rel_out, ok, err = process_one(
+            rel_out, ok, err, method = process_one(
                 inp, rel, args.output_root, args.save_debug, cfg_dict
             )
             status = "OK  " if ok else "FAIL"
-            print(f"[{i:>5}/{len(items)}] {status} {rel_out}")
+            tag = f" [{method}]" if method else ""
+            print(f"[{i:>5}/{len(items)}] {status}{tag} {rel_out}")
             if not ok:
                 failures.append((rel_out, err))
     else:
@@ -159,9 +183,10 @@ def main():
                 for inp, rel in items
             }
             for i, fut in enumerate(as_completed(futs), 1):
-                rel_out, ok, err = fut.result()
+                rel_out, ok, err, method = fut.result()
                 status = "OK  " if ok else "FAIL"
-                print(f"[{i:>5}/{len(items)}] {status} {rel_out}")
+                tag = f" [{method}]" if method else ""
+                print(f"[{i:>5}/{len(items)}] {status}{tag} {rel_out}")
                 if not ok:
                     failures.append((rel_out, err))
 
