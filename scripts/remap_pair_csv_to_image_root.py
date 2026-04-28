@@ -51,6 +51,21 @@ def normalize_posix(path_str: str) -> str:
     return str(path_str).replace("\\", "/")
 
 
+def append_index(mapping, key, value):
+    if key is None:
+        return
+    mapping.setdefault(key, []).append(value)
+
+
+def canonical_original_filename(filename: str) -> str:
+    path = Path(str(filename))
+    stem = path.stem
+    suffix = path.suffix
+    if "__" in stem:
+        stem = stem.split("__", 1)[0]
+    return f"{stem}{suffix}"
+
+
 def remap_single_path(path_str: str, source_root: Path, target_root: Path) -> str:
     src_root = normalize_posix(str(source_root)).rstrip("/")
     tgt_root = normalize_posix(str(target_root)).rstrip("/")
@@ -100,6 +115,122 @@ def build_split_case_path(row: pd.Series, target_root: Path, side: str, case_dir
     return normalize_posix(str(Path(target_root) / split_name / case_dir / class_dir / filename))
 
 
+def build_target_index(target_root: Path) -> dict:
+    png_paths = sorted(target_root.rglob("*.png"))
+    by_exact = {}
+    by_case_class_filename = {}
+    by_split_class_filename = {}
+    by_class_filename = {}
+    by_filename = {}
+    by_case_class_canonical_filename = {}
+    by_split_class_canonical_filename = {}
+    by_class_canonical_filename = {}
+    by_canonical_filename = {}
+
+    for path in png_paths:
+        full_path = normalize_posix(str(path))
+        try:
+            rel_parts = path.relative_to(target_root).parts
+        except ValueError:
+            rel_parts = path.parts
+
+        filename = path.name
+        canonical_filename = canonical_original_filename(filename)
+        split_name = None
+        case_dir = None
+        class_dir = None
+
+        for idx, part in enumerate(rel_parts):
+            part_str = str(part)
+            if part_str in {"train", "val", "test"} and split_name is None:
+                split_name = part_str
+            if part_str in {"normal", "abnormal"} and class_dir is None:
+                class_dir = part_str
+                if idx > 0:
+                    case_dir = str(rel_parts[idx - 1])
+
+        append_index(by_exact, (split_name, case_dir, class_dir, filename), full_path)
+        append_index(by_case_class_filename, (case_dir, class_dir, filename), full_path)
+        append_index(by_split_class_filename, (split_name, class_dir, filename), full_path)
+        append_index(by_class_filename, (class_dir, filename), full_path)
+        append_index(by_filename, filename, full_path)
+        append_index(by_case_class_canonical_filename, (case_dir, class_dir, canonical_filename), full_path)
+        append_index(by_split_class_canonical_filename, (split_name, class_dir, canonical_filename), full_path)
+        append_index(by_class_canonical_filename, (class_dir, canonical_filename), full_path)
+        append_index(by_canonical_filename, canonical_filename, full_path)
+
+    return {
+        "total_png": len(png_paths),
+        "by_exact": by_exact,
+        "by_case_class_filename": by_case_class_filename,
+        "by_split_class_filename": by_split_class_filename,
+        "by_class_filename": by_class_filename,
+        "by_filename": by_filename,
+        "by_case_class_canonical_filename": by_case_class_canonical_filename,
+        "by_split_class_canonical_filename": by_split_class_canonical_filename,
+        "by_class_canonical_filename": by_class_canonical_filename,
+        "by_canonical_filename": by_canonical_filename,
+    }
+
+
+def unique_or_none(candidates):
+    unique = list(dict.fromkeys(candidates))
+    if len(unique) == 1:
+        return unique[0]
+    return None
+
+
+def resolve_from_target_index(row: pd.Series, side: str, target_index: dict, case_dir_column: str) -> str:
+    if "split" not in row.index:
+        raise ValueError("mode=splits_case_layout requires `split` column.")
+
+    filename_col = f"{side}_filename"
+    label_col = f"{side}_single_label"
+    if filename_col not in row.index:
+        raise ValueError(f"mode=splits_case_layout requires `{filename_col}` column.")
+    if label_col not in row.index:
+        raise ValueError(f"mode=splits_case_layout requires `{label_col}` column.")
+
+    split_name = str(row["split"]).strip()
+    case_dir = choose_case_dir(row, case_dir_column)
+    filename = str(row[filename_col]).strip()
+    canonical_filename = canonical_original_filename(filename)
+    class_dir = label_to_class_dir(row[label_col])
+
+    lookup_order = [
+        target_index["by_exact"].get((split_name, case_dir, class_dir, filename), []),
+        target_index["by_case_class_filename"].get((case_dir, class_dir, filename), []),
+        target_index["by_split_class_filename"].get((split_name, class_dir, filename), []),
+        target_index["by_class_filename"].get((class_dir, filename), []),
+        target_index["by_filename"].get(filename, []),
+        target_index["by_case_class_canonical_filename"].get((case_dir, class_dir, canonical_filename), []),
+        target_index["by_split_class_canonical_filename"].get((split_name, class_dir, canonical_filename), []),
+        target_index["by_class_canonical_filename"].get((class_dir, canonical_filename), []),
+        target_index["by_canonical_filename"].get(canonical_filename, []),
+    ]
+
+    for candidates in lookup_order:
+        resolved = unique_or_none(candidates)
+        if resolved is not None:
+            return resolved
+
+    merged_candidates = []
+    for candidates in lookup_order:
+        merged_candidates.extend(candidates)
+    merged_unique = list(dict.fromkeys(merged_candidates))
+
+    if len(merged_unique) == 0:
+        raise FileNotFoundError(
+            f"No target image matched side={side}, split={split_name}, case_dir={case_dir}, "
+            f"class_dir={class_dir}, filename={filename}"
+        )
+
+    raise ValueError(
+        f"Ambiguous target image match for side={side}, split={split_name}, case_dir={case_dir}, "
+        f"class_dir={class_dir}, filename={filename}. Candidates={merged_unique[:5]}"
+    )
+
+
 def remap_pair_df(
     df: pd.DataFrame,
     source_root: Path,
@@ -107,18 +238,21 @@ def remap_pair_df(
     strict_exists: bool,
     mode: str,
     case_dir_column: str,
+    target_index: dict = None,
 ) -> pd.DataFrame:
     out = df.copy()
     if mode == "prefix_replace":
         out["left_path"] = out["left_path"].astype(str).map(lambda p: remap_single_path(p, source_root, target_root))
         out["right_path"] = out["right_path"].astype(str).map(lambda p: remap_single_path(p, source_root, target_root))
     elif mode == "splits_case_layout":
+        if target_index is None:
+            target_index = build_target_index(target_root)
         out["left_path"] = out.apply(
-            lambda row: build_split_case_path(row, target_root=target_root, side="left", case_dir_column=case_dir_column),
+            lambda row: resolve_from_target_index(row, side="left", target_index=target_index, case_dir_column=case_dir_column),
             axis=1,
         )
         out["right_path"] = out.apply(
-            lambda row: build_split_case_path(row, target_root=target_root, side="right", case_dir_column=case_dir_column),
+            lambda row: resolve_from_target_index(row, side="right", target_index=target_index, case_dir_column=case_dir_column),
             axis=1,
         )
     else:
@@ -194,6 +328,7 @@ def main():
     train_df = pd.read_csv(args.train_csv)
     val_df = pd.read_csv(args.val_csv)
     test_df = pd.read_csv(args.test_csv)
+    target_index = build_target_index(target_root) if args.mode == "splits_case_layout" else None
 
     train_out = remap_pair_df(
         train_df,
@@ -202,6 +337,7 @@ def main():
         args.strict_exists,
         mode=args.mode,
         case_dir_column=args.case_dir_column,
+        target_index=target_index,
     )
     val_out = remap_pair_df(
         val_df,
@@ -210,6 +346,7 @@ def main():
         args.strict_exists,
         mode=args.mode,
         case_dir_column=args.case_dir_column,
+        target_index=target_index,
     )
     test_out = remap_pair_df(
         test_df,
@@ -218,6 +355,7 @@ def main():
         args.strict_exists,
         mode=args.mode,
         case_dir_column=args.case_dir_column,
+        target_index=target_index,
     )
 
     train_out.to_csv(output_csv_dir / "train.csv", index=False)
@@ -237,6 +375,8 @@ def main():
     print(f"Saved remapped pair CSVs to {output_csv_dir}")
     print(f"Saved split summary to {output_csv_dir / 'split_summary.csv'}")
     print(f"Saved report to {report_path}")
+    if target_index is not None:
+        print(f"Indexed {int(target_index['total_png'])} png files under {target_root}")
 
 
 if __name__ == "__main__":
