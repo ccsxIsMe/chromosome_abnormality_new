@@ -1,0 +1,4 @@
+split,pairs,normal_pairs,abnormal_pairs,cases,chromosomes
+train,11814,11814,0,20,23
+val,2359,2256,103,6,23
+test,2325,2221,104,6,23

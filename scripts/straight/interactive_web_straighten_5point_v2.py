@@ -355,7 +355,7 @@ async function api(path, payload=null) {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(payload)
   } : {};
-  const r = await fetch(path, opts);
+  const r = await fetch(path.replace(/^\//, ""), opts);
   if (!r.ok) {
     const text = await r.text();
     throw new Error(text || r.statusText);
@@ -468,7 +468,7 @@ async function loadImage(i) {
   previewImg.removeAttribute("src");
   document.getElementById("previewInfo").innerText = "";
 
-  const meta = await api(`/api/image?index=${idx}`);
+  const meta = await api(`api/image?index=${idx}`);
   originalW = meta.width;
   originalH = meta.height;
   document.getElementById("title").innerText = `[${idx+1}/${images.length}] ${meta.rel_path}`;
@@ -497,7 +497,7 @@ async function previewCurrent() {
   if (points.length !== N_POINTS) return;
   setStatus("正在生成预览...");
   try {
-    const res = await api("/api/preview", {
+    const res = await api("api/preview", {
       index: idx,
       points_yx: pointsYX()
     });
@@ -534,7 +534,7 @@ async function saveCurrent() {
   }
   setStatus("正在保存...");
   try {
-    const res = await api("/api/save", {
+    const res = await api("api/save", {
       index: idx,
       points_yx: pointsYX()
     });
@@ -569,13 +569,18 @@ document.addEventListener("keydown", async (ev) => {
 });
 
 async function init() {
-  const res = await api("/api/list");
-  images = res.images;
-  if (images.length === 0) {
-    setStatus("没有找到图片");
-    return;
+  try {
+    const res = await api("api/list");
+    images = res.images;
+    if (images.length === 0) {
+      setStatus("没有找到图片");
+      return;
+    }
+    await loadImage(0);
+  } catch (e) {
+    setStatus("页面初始化失败：" + e.message);
+    console.error(e);
   }
-  await loadImage(0);
 }
 init();
 </script>
