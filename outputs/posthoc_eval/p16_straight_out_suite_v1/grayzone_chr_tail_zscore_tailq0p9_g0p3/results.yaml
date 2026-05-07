@@ -1,0 +1,330 @@
+method: grayzone_reranker_posthoc
+config_path: configs/p16_pair_normal_only_v1_correspondence_interval_convnext_tiny_multi_prototype_metric_straight_out_v1.yaml
+checkpoint_path: outputs/experiments/p16_pair_normal_only_v1_correspondence_interval_convnext_tiny_multi_prototype_metric_straight_out_v1/best_model.pth
+experiment_name: p16_pair_normal_only_v1_correspondence_interval_convnext_tiny_multi_prototype_metric_straight_out_v1
+base_score_mode: chr_tail_zscore
+tail_quantile: 0.9
+gray_zone_ratio: 0.3
+gray_zone_margin: 31.34354937576112
+base_val_threshold: 32.041647188528586
+base_val_best_score: 0.2580645161290323
+base_val_best_stats:
+  precision: 0.38461538461538464
+  recall: 0.1941747572815534
+  f1: 0.2580645161290323
+  balanced_acc: 0.5899951800592164
+rerank_threshold_from_val: 0.8341708542713568
+rerank_val_best_score: 0.48128342245989303
+rerank_val_best_stats:
+  precision: 0.5357142857142857
+  recall: 0.4368932038834951
+  f1: 0.48128342245989303
+  balanced_acc: 0.709802984920471
+fit_split: val_gray_zone_only
+fit_counts:
+  fit_total: 708
+  fit_normal: 662
+  fit_abnormal: 46
+  val_gray_zone_total: 708
+  test_gray_zone_total: 649
+feature_columns:
+- chr_1
+- chr_10
+- chr_11
+- chr_12
+- chr_13
+- chr_14
+- chr_15
+- chr_16
+- chr_17
+- chr_18
+- chr_19
+- chr_2
+- chr_20
+- chr_21
+- chr_22
+- chr_3
+- chr_4
+- chr_5
+- chr_6
+- chr_7
+- chr_8
+- chr_9
+- chr_X
+- embedding_norm
+- pair_consistency_abs_gap
+- pair_consistency_direct
+- pair_consistency_gap
+- pair_consistency_reverse
+- pair_distance
+- prototype_gap12
+- prototype_max_dist
+- prototype_mean_dist
+- prototype_min_dist
+- prototype_second_dist
+- prototype_std_dist
+- reverse_gain
+- score_chr_percentile
+- score_chr_robust_zscore
+- score_chr_tail_zscore
+- score_chr_zscore
+- score_raw
+top_coefficients:
+- feature: chr_15
+  coef: 1.3486886819604555
+- feature: score_chr_zscore
+  coef: 1.289549147329352
+- feature: chr_11
+  coef: 1.0519656328682365
+- feature: score_chr_tail_zscore
+  coef: -0.9308000183140317
+- feature: chr_2
+  coef: 0.8497181090454543
+- feature: chr_13
+  coef: 0.8408661670406873
+- feature: chr_1
+  coef: 0.7134744276720416
+- feature: chr_4
+  coef: 0.61205381609852
+- feature: chr_X
+  coef: -0.5701427779672115
+- feature: chr_16
+  coef: -0.53671657590129
+- feature: chr_18
+  coef: -0.5256270620079492
+- feature: chr_3
+  coef: -0.5184175444863637
+- feature: reverse_gain
+  coef: -0.4857722949613746
+- feature: chr_20
+  coef: -0.4754301343577007
+- feature: pair_consistency_abs_gap
+  coef: -0.4682837434713216
+- feature: pair_consistency_gap
+  coef: 0.4682083895273239
+- feature: pair_consistency_reverse
+  coef: 0.4363482856843193
+- feature: chr_17
+  coef: -0.4213203336830935
+- feature: pair_consistency_direct
+  coef: -0.413748196412202
+- feature: chr_14
+  coef: -0.4134059879459428
+val_base_metrics:
+  auroc: 0.6875473387041244
+  auprc: 0.18666687947177338
+  f1: 0.2580645161290323
+  precision_abnormal: 0.38461538461538464
+  recall_abnormal: 0.1941747572815534
+  balanced_acc: 0.5899951800592164
+  confusion_matrix:
+    tn: 2224
+    fp: 32
+    fn: 83
+    tp: 20
+  normal:
+    acc: 0.9858156028368794
+    precision: 0.9640225400953619
+    recall: 0.9858156028368794
+    f1: 0.9747972824895902
+    support: 2256
+  abnormal:
+    acc: 0.1941747572815534
+    precision: 0.38461538461538464
+    recall: 0.1941747572815534
+    f1: 0.2580645161290323
+    support: 103
+test_base_metrics:
+  auroc: 0.7522512381809995
+  auprc: 0.4965505915921602
+  f1: 0.6321243523316062
+  precision_abnormal: 0.6853932584269663
+  recall_abnormal: 0.5865384615384616
+  balanced_acc: 0.7869657638624321
+  confusion_matrix:
+    tn: 2193
+    fp: 28
+    fn: 43
+    tp: 61
+  normal:
+    acc: 0.9873930661864025
+    precision: 0.9807692307692307
+    recall: 0.9873930661864025
+    f1: 0.9840700022436616
+    support: 2221
+  abnormal:
+    acc: 0.5865384615384616
+    precision: 0.6853932584269663
+    recall: 0.5865384615384616
+    f1: 0.6321243523316062
+    support: 104
+val_final_metrics:
+  auroc: 0.6875473387041244
+  auprc: 0.18666687947177338
+  f1: 0.48128342245989303
+  precision_abnormal: 0.5357142857142857
+  recall_abnormal: 0.4368932038834951
+  balanced_acc: 0.709802984920471
+  confusion_matrix:
+    tn: 2217
+    fp: 39
+    fn: 58
+    tp: 45
+  normal:
+    acc: 0.9827127659574468
+    precision: 0.9745054945054945
+    recall: 0.9827127659574468
+    f1: 0.9785919223129552
+    support: 2256
+  abnormal:
+    acc: 0.4368932038834951
+    precision: 0.5357142857142857
+    recall: 0.4368932038834951
+    f1: 0.48128342245989303
+    support: 103
+test_final_metrics:
+  auroc: 0.7522512381809995
+  auprc: 0.4965505915921602
+  f1: 0.5658536585365854
+  precision_abnormal: 0.5742574257425742
+  recall_abnormal: 0.5576923076923077
+  balanced_acc: 0.7691658296678558
+  confusion_matrix:
+    tn: 2178
+    fp: 43
+    fn: 46
+    tp: 58
+  normal:
+    acc: 0.9806393516434039
+    precision: 0.97931654676259
+    recall: 0.9806393516434039
+    f1: 0.9799775028121485
+    support: 2221
+  abnormal:
+    acc: 0.5576923076923077
+    precision: 0.5742574257425742
+    recall: 0.5576923076923077
+    f1: 0.5658536585365854
+    support: 104
+val_gray_reranker_metrics:
+  auroc: 0.9550768422435308
+  auprc: 0.6935845060342916
+  f1: 0.6341463414634146
+  precision_abnormal: 0.7222222222222222
+  recall_abnormal: 0.5652173913043478
+  balanced_acc: 0.7750558255615394
+  confusion_matrix:
+    tn: 652
+    fp: 10
+    fn: 20
+    tp: 26
+  normal:
+    acc: 0.9848942598187311
+    precision: 0.9702380952380952
+    recall: 0.9848942598187311
+    f1: 0.977511244377811
+    support: 662
+  abnormal:
+    acc: 0.5652173913043478
+    precision: 0.7222222222222222
+    recall: 0.5652173913043478
+    f1: 0.6341463414634146
+    support: 46
+test_gray_reranker_metrics:
+  auroc: 0.45928008998875136
+  auprc: 0.0831176333924045
+  f1: 0.1081081081081081
+  precision_abnormal: 0.08695652173913043
+  recall_abnormal: 0.14285714285714285
+  balanced_acc: 0.5548931383577053
+  confusion_matrix:
+    tn: 614
+    fp: 21
+    fn: 12
+    tp: 2
+  normal:
+    acc: 0.9669291338582677
+    precision: 0.9808306709265175
+    recall: 0.9669291338582677
+    f1: 0.9738302934179223
+    support: 635
+  abnormal:
+    acc: 0.14285714285714285
+    precision: 0.08695652173913043
+    recall: 0.14285714285714285
+    f1: 0.1081081081081081
+    support: 14
+test_by_subtype_base:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.0
+  gray_zone_count: 1
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.5625
+  gray_zone_count: 8
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  gray_zone_count: 3
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  gray_zone_count: 0
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  gray_zone_count: 0
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.11764705882352941
+  gray_zone_count: 2
+test_by_subtype_final:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.0
+  gray_zone_count: 1
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.46875
+  gray_zone_count: 8
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.0
+  gray_zone_count: 3
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 1.0
+  gray_zone_count: 0
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 1.0
+  gray_zone_count: 0
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.11764705882352941
+  gray_zone_count: 2
