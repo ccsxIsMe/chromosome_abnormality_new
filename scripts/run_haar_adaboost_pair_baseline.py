@@ -10,7 +10,11 @@ from sklearn.tree import DecisionTreeClassifier
 from tqdm import tqdm
 
 from src.utils.casewise_calibration import summarize_case_isolation
-from src.utils.haar_pair_features import extract_pair_features_from_paths
+from src.utils.haar_pair_features import (
+    build_haar_kernel_catalog,
+    extract_pair_features_from_paths,
+    normalize_haar_feature_set,
+)
 from src.utils.metrics import compute_classification_metrics, search_best_threshold
 
 
@@ -58,6 +62,7 @@ def build_feature_dataframe(
     split_name,
     representation_version,
     pair_orientation_align,
+    feature_set,
 ):
     rows = []
     for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Extract-{split_name}", leave=False):
@@ -69,6 +74,7 @@ def build_feature_dataframe(
             kernel_sizes=kernel_sizes,
             representation_version=representation_version,
             pair_orientation_align=pair_orientation_align,
+            feature_set=feature_set,
         )
         feature_row["label"] = int(row["label"])
         feature_row["chromosome_id"] = str(row["chromosome_id"])
@@ -85,6 +91,66 @@ def build_feature_dataframe(
         )
         rows.append(feature_row)
     return pd.DataFrame(rows)
+
+
+def select_haar_feature_columns(train_df, feature_columns, select_mode, top_k):
+    select_mode = str(select_mode).strip().lower()
+    if select_mode == "all":
+        return feature_columns, []
+
+    top_k = max(int(top_k), 1)
+    labels = train_df["label"].astype(int).to_numpy()
+    pos_mask = labels == 1
+    neg_mask = labels == 0
+    if pos_mask.sum() == 0 or neg_mask.sum() == 0:
+        return feature_columns, []
+
+    scored_rows = []
+    for col in feature_columns:
+        values = pd.to_numeric(train_df[col], errors="coerce").fillna(0.0).astype(np.float32).to_numpy()
+        pos_values = values[pos_mask]
+        neg_values = values[neg_mask]
+        pos_mean = float(pos_values.mean()) if pos_values.size > 0 else 0.0
+        neg_mean = float(neg_values.mean()) if neg_values.size > 0 else 0.0
+        pooled_std = float(values.std()) + 1e-6
+        effect_size = abs(pos_mean - neg_mean) / pooled_std
+
+        if select_mode == "topk_1d" and not (
+            col.startswith("haar_")
+            or col.startswith("profile_")
+            or col.startswith("width_")
+            or col.startswith("left_profile_")
+            or col.startswith("right_profile_")
+            or col.startswith("left_width_")
+            or col.startswith("right_width_")
+            or col.startswith("seg")
+        ):
+            continue
+        if select_mode == "topk_2d" and not col.startswith("haar2d_"):
+            continue
+        if select_mode == "topk_shape" and (
+            col.startswith("haar_")
+            or col.startswith("haar2d_")
+            or col.startswith("profile_")
+            or col.startswith("seg")
+        ):
+            continue
+
+        scored_rows.append(
+            {
+                "feature": col,
+                "effect_size": float(effect_size),
+                "pos_mean": pos_mean,
+                "neg_mean": neg_mean,
+            }
+        )
+
+    if not scored_rows:
+        return feature_columns, []
+
+    scored_rows = sorted(scored_rows, key=lambda item: item["effect_size"], reverse=True)
+    selected = [row["feature"] for row in scored_rows[:top_k]]
+    return selected, scored_rows
 
 
 def get_feature_columns(df):
@@ -185,6 +251,13 @@ def main():
     parser.add_argument("--kernel_sizes", default="4,8,16,32,64")
     parser.add_argument("--representation_version", default="v1", choices=["v1", "v2", "v3"])
     parser.add_argument("--pair_orientation_align", action="store_true")
+    parser.add_argument("--feature_set", default="1d", choices=["1d", "2d", "1d2d", "1d+2d", "both", "all"])
+    parser.add_argument(
+        "--feature_select_mode",
+        default="all",
+        choices=["all", "topk", "topk_1d", "topk_2d", "topk_shape"],
+    )
+    parser.add_argument("--feature_topk", type=int, default=128)
     parser.add_argument("--n_estimators", type=int, default=200)
     parser.add_argument("--learning_rate", type=float, default=0.5)
     parser.add_argument("--max_depth", type=int, default=1)
@@ -195,6 +268,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     kernel_sizes = parse_int_list(args.kernel_sizes)
+    feature_set = normalize_haar_feature_set(args.feature_set)
     train_df = pd.read_csv(args.train_csv)
     val_df = pd.read_csv(args.val_csv)
     test_df = pd.read_csv(args.test_csv)
@@ -214,6 +288,7 @@ def main():
         split_name="train",
         representation_version=args.representation_version,
         pair_orientation_align=args.pair_orientation_align,
+        feature_set=feature_set,
     )
     val_features_df = build_feature_dataframe(
         val_df,
@@ -223,6 +298,7 @@ def main():
         split_name="val",
         representation_version=args.representation_version,
         pair_orientation_align=args.pair_orientation_align,
+        feature_set=feature_set,
     )
     test_features_df = build_feature_dataframe(
         test_df,
@@ -232,9 +308,17 @@ def main():
         split_name="test",
         representation_version=args.representation_version,
         pair_orientation_align=args.pair_orientation_align,
+        feature_set=feature_set,
     )
 
     feature_columns = get_feature_columns(train_features_df)
+    selected_feature_columns, selection_rows = select_haar_feature_columns(
+        train_df=train_features_df,
+        feature_columns=feature_columns,
+        select_mode=args.feature_select_mode,
+        top_k=args.feature_topk,
+    )
+    feature_columns = selected_feature_columns
     x_train = train_features_df[feature_columns].astype(np.float32).to_numpy()
     y_train = train_features_df["label"].astype(int).to_numpy()
     x_val = val_features_df[feature_columns].astype(np.float32).to_numpy()
@@ -289,6 +373,14 @@ def main():
         )
 
     top_features = maybe_save_feature_importance(model, feature_columns, output_dir)
+    if selection_rows:
+        pd.DataFrame(selection_rows).to_csv(output_dir / "feature_selection_scores.csv", index=False)
+
+    kernel_catalog = build_haar_kernel_catalog(
+        kernel_sizes=kernel_sizes,
+        feature_set=feature_set,
+        band_width=int(args.band_width),
+    )
 
     summary_lines = [
         "# Haar-like + AdaBoost Pair Baseline",
@@ -299,6 +391,9 @@ def main():
         f"- kernel_sizes: `{kernel_sizes}`",
         f"- representation_version: `{args.representation_version}`",
         f"- pair_orientation_align: `{args.pair_orientation_align}`",
+        f"- feature_set: `{feature_set}`",
+        f"- feature_select_mode: `{args.feature_select_mode}`",
+        f"- selected_feature_count: `{len(feature_columns)}`",
         f"- n_estimators: `{args.n_estimators}`",
         f"- learning_rate: `{args.learning_rate}`",
         f"- weak_learner_max_depth: `{args.max_depth}`",
@@ -328,7 +423,11 @@ def main():
             "kernel_sizes": kernel_sizes,
             "representation_version": args.representation_version,
             "pair_orientation_align": bool(args.pair_orientation_align),
+            "feature_set": feature_set,
+            "feature_select_mode": str(args.feature_select_mode),
+            "feature_topk": int(args.feature_topk),
             "num_feature_columns": int(len(feature_columns)),
+            "haar_kernel_catalog": kernel_catalog,
         },
         "model_settings": {
             "classifier": "AdaBoostClassifier",
@@ -345,6 +444,7 @@ def main():
         "test_metrics_05": test_metrics_05,
         "test_metrics_best": test_metrics_best,
         "top_feature_importance": top_features,
+        "selected_feature_columns": feature_columns,
         "train_distribution_by_chromosome": summarize_by_chromosome(train_features_df),
         "val_distribution_by_chromosome": summarize_by_chromosome(val_features_df),
         "test_distribution_by_chromosome": summarize_by_chromosome(test_features_df),

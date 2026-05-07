@@ -15,7 +15,11 @@ from src.main import _forward_model, _safe_load_state_dict, build_eval_loader_fo
 from src.models.build_model import build_model
 from src.utils.casewise_calibration import summarize_case_isolation
 from src.utils.chromosome_vocab import canonicalize_chromosome_id
-from src.utils.haar_pair_features import extract_pair_features_from_paths
+from src.utils.haar_pair_features import (
+    build_haar_kernel_catalog,
+    extract_pair_features_from_paths,
+    normalize_haar_feature_set,
+)
 from src.utils.metrics import compute_classification_metrics, search_best_threshold
 
 
@@ -228,6 +232,7 @@ def build_haar_feature_dataframe(
     split_name,
     representation_version,
     pair_orientation_align,
+    feature_set,
 ):
     rows = []
     for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Extract-Haar-{split_name}", leave=False):
@@ -239,6 +244,7 @@ def build_haar_feature_dataframe(
             kernel_sizes=kernel_sizes,
             representation_version=representation_version,
             pair_orientation_align=pair_orientation_align,
+            feature_set=feature_set,
         )
         feature_row["label"] = int(row["label"])
         feature_row["chromosome_id"] = str(row["chromosome_id"])
@@ -255,6 +261,66 @@ def build_haar_feature_dataframe(
         )
         rows.append(feature_row)
     return pd.DataFrame(rows)
+
+
+def select_haar_feature_columns(train_df, feature_columns, select_mode, top_k):
+    select_mode = str(select_mode).strip().lower()
+    if select_mode == "all":
+        return feature_columns, []
+
+    top_k = max(int(top_k), 1)
+    labels = train_df["label"].astype(int).to_numpy()
+    pos_mask = labels == 1
+    neg_mask = labels == 0
+    if pos_mask.sum() == 0 or neg_mask.sum() == 0:
+        return feature_columns, []
+
+    scored_rows = []
+    for col in feature_columns:
+        values = pd.to_numeric(train_df[col], errors="coerce").fillna(0.0).astype(np.float32).to_numpy()
+        pos_values = values[pos_mask]
+        neg_values = values[neg_mask]
+        pos_mean = float(pos_values.mean()) if pos_values.size > 0 else 0.0
+        neg_mean = float(neg_values.mean()) if neg_values.size > 0 else 0.0
+        pooled_std = float(values.std()) + 1e-6
+        effect_size = abs(pos_mean - neg_mean) / pooled_std
+
+        if select_mode == "topk_1d" and not (
+            col.startswith("haar_")
+            or col.startswith("profile_")
+            or col.startswith("width_")
+            or col.startswith("left_profile_")
+            or col.startswith("right_profile_")
+            or col.startswith("left_width_")
+            or col.startswith("right_width_")
+            or col.startswith("seg")
+        ):
+            continue
+        if select_mode == "topk_2d" and not col.startswith("haar2d_"):
+            continue
+        if select_mode == "topk_shape" and (
+            col.startswith("haar_")
+            or col.startswith("haar2d_")
+            or col.startswith("profile_")
+            or col.startswith("seg")
+        ):
+            continue
+
+        scored_rows.append(
+            {
+                "feature": col,
+                "effect_size": float(effect_size),
+                "pos_mean": pos_mean,
+                "neg_mean": neg_mean,
+            }
+        )
+
+    if not scored_rows:
+        return feature_columns, []
+
+    scored_rows = sorted(scored_rows, key=lambda item: item["effect_size"], reverse=True)
+    selected = [row["feature"] for row in scored_rows[:top_k]]
+    return selected, scored_rows
 
 
 def _normalize_key_columns(df, keys):
@@ -547,6 +613,13 @@ def main():
     parser.add_argument("--kernel_sizes", default="4,8,16,32,64")
     parser.add_argument("--representation_version", default="v2", choices=["v1", "v2", "v3"])
     parser.add_argument("--pair_orientation_align", action="store_true")
+    parser.add_argument("--feature_set", default="1d", choices=["1d", "2d", "1d2d", "1d+2d", "both", "all"])
+    parser.add_argument(
+        "--haar_feature_select_mode",
+        default="all",
+        choices=["all", "topk", "topk_1d", "topk_2d", "topk_shape"],
+    )
+    parser.add_argument("--haar_feature_topk", type=int, default=128)
     parser.add_argument("--classifier", default="gradient_boosting", choices=["adaboost", "gradient_boosting"])
     parser.add_argument("--n_estimators", type=int, default=200)
     parser.add_argument("--learning_rate", type=float, default=0.05)
@@ -562,6 +635,7 @@ def main():
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    feature_set = normalize_haar_feature_set(args.feature_set)
 
     cfg = load_config(args.config)
     set_seed(int(args.seed))
@@ -627,6 +701,8 @@ def main():
         train_df = train_model_df.copy()
         val_df = val_model_df.copy()
         test_df = test_model_df.copy()
+        selected_haar_columns = []
+        haar_selection_rows = []
     else:
         kernel_sizes = parse_int_list(args.kernel_sizes)
         train_haar_df = build_haar_feature_dataframe(
@@ -637,6 +713,7 @@ def main():
             split_name="train",
             representation_version=args.representation_version,
             pair_orientation_align=args.pair_orientation_align,
+            feature_set=feature_set,
         )
         val_haar_df = build_haar_feature_dataframe(
             val_csv_df,
@@ -646,6 +723,7 @@ def main():
             split_name="val",
             representation_version=args.representation_version,
             pair_orientation_align=args.pair_orientation_align,
+            feature_set=feature_set,
         )
         test_haar_df = build_haar_feature_dataframe(
             test_csv_df,
@@ -655,7 +733,30 @@ def main():
             split_name="test",
             representation_version=args.representation_version,
             pair_orientation_align=args.pair_orientation_align,
+            feature_set=feature_set,
         )
+        metadata_columns = {
+            "label",
+            "chromosome_id",
+            "case_id",
+            "pair_key",
+            "split",
+            "left_path",
+            "right_path",
+            "abnormal_subtype_id",
+            "subtype_status",
+        }
+        haar_feature_columns = [col for col in train_haar_df.columns if col not in metadata_columns]
+        selected_haar_columns, haar_selection_rows = select_haar_feature_columns(
+            train_df=train_haar_df,
+            feature_columns=haar_feature_columns,
+            select_mode=args.haar_feature_select_mode,
+            top_k=args.haar_feature_topk,
+        )
+        keep_columns = [col for col in train_haar_df.columns if col in metadata_columns or col in selected_haar_columns]
+        train_haar_df = train_haar_df[keep_columns].copy()
+        val_haar_df = val_haar_df[keep_columns].copy()
+        test_haar_df = test_haar_df[keep_columns].copy()
         train_df = merge_feature_frames(train_model_df, train_haar_df)
         val_df = merge_feature_frames(val_model_df, val_haar_df)
         test_df = merge_feature_frames(test_model_df, test_haar_df)
@@ -729,6 +830,8 @@ def main():
     feature_importance_rows = maybe_save_feature_importance(classifier, feature_columns, output_dir)
     source_importance_rows = summarize_feature_source_importance(feature_importance_rows)
     pd.DataFrame(source_importance_rows).to_csv(output_dir / "feature_source_importance.csv", index=False)
+    if haar_selection_rows:
+        pd.DataFrame(haar_selection_rows).to_csv(output_dir / "haar_feature_selection_scores.csv", index=False)
 
     summary_lines = [
         "# P16 + Haar Frozen-Feature Boost Fusion",
@@ -745,6 +848,9 @@ def main():
         f"- use_embedding: `{not args.disable_embedding}`",
         f"- use_prototype_distances: `{not args.disable_prototype_distances}`",
         f"- use_model_scalars: `{not args.disable_model_scalars}`",
+        f"- haar_feature_set: `{feature_set}`",
+        f"- haar_feature_select_mode: `{args.haar_feature_select_mode}`",
+        f"- selected_haar_feature_count: `{len(selected_haar_columns)}`",
         f"- embedding_pca_dim: `{args.embedding_pca_dim}`",
         f"- num_feature_columns: `{len(feature_columns)}`",
         f"- feature_sanitize_info: `{feature_sanitize_info}`",
@@ -781,6 +887,16 @@ def main():
             "kernel_sizes": parse_int_list(args.kernel_sizes),
             "representation_version": args.representation_version,
             "pair_orientation_align": bool(args.pair_orientation_align),
+            "haar_feature_set": feature_set,
+            "haar_feature_select_mode": str(args.haar_feature_select_mode),
+            "haar_feature_topk": int(args.haar_feature_topk),
+            "selected_haar_feature_count": int(len(selected_haar_columns)),
+            "selected_haar_feature_columns": selected_haar_columns,
+            "haar_kernel_catalog": build_haar_kernel_catalog(
+                kernel_sizes=parse_int_list(args.kernel_sizes),
+                feature_set=feature_set,
+                band_width=int(args.band_width),
+            ) if not args.disable_haar else None,
             "use_haar": bool(not args.disable_haar),
             "use_embedding": bool(not args.disable_embedding),
             "use_prototype_distances": bool(not args.disable_prototype_distances),

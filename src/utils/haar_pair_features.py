@@ -1818,6 +1818,29 @@ def default_haar_specifications() -> List[Tuple[str, Tuple[float, ...]]]:
     ]
 
 
+def default_haar_2d_specifications() -> List[Tuple[str, Tuple[Tuple[float, ...], ...]]]:
+    return [
+        ("axial_step", ((1.0,), (-1.0,))),
+        ("lateral_step", ((1.0, -1.0),)),
+        ("checker", ((1.0, -1.0), (-1.0, 1.0))),
+        ("axial_center_surround", ((1.0,), (-2.0,), (1.0,))),
+        ("lateral_center_surround", ((1.0, -2.0, 1.0),)),
+    ]
+
+
+def normalize_haar_feature_set(feature_set: str) -> str:
+    normalized = str(feature_set).strip().lower()
+    aliases = {
+        "1d+2d": "1d2d",
+        "both": "1d2d",
+        "all": "1d2d",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized not in {"1d", "2d", "1d2d"}:
+        raise ValueError(f"Unsupported Haar feature set: {feature_set}")
+    return normalized
+
+
 def safe_corrcoef(a: np.ndarray, b: np.ndarray) -> float:
     a = np.asarray(a, dtype=np.float32)
     b = np.asarray(b, dtype=np.float32)
@@ -1849,6 +1872,68 @@ def summarize_response(values: np.ndarray, prefix: str) -> Dict[str, float]:
         f"{prefix}_mean_abs": float(abs_values.mean()),
         f"{prefix}_max_abs": float(abs_values.max()),
     }
+
+
+def build_haar_kernel_2d(height: int, width: int, weights: Sequence[Sequence[float]]) -> np.ndarray:
+    height = int(height)
+    width = int(width)
+    weight_rows = [tuple(float(v) for v in row) for row in weights]
+    num_row_segments = len(weight_rows)
+    num_col_segments = len(weight_rows[0]) if num_row_segments > 0 else 0
+    if num_row_segments == 0 or num_col_segments == 0:
+        raise ValueError("2D Haar weights must be non-empty")
+    if height < num_row_segments or width < num_col_segments:
+        raise ValueError(
+            f"2D Haar kernel size {(height, width)} is smaller than segment grid "
+            f"{(num_row_segments, num_col_segments)}"
+        )
+
+    kernel = np.zeros((height, width), dtype=np.float32)
+    row_base = height // num_row_segments
+    row_rem = height % num_row_segments
+    col_base = width // num_col_segments
+    col_rem = width % num_col_segments
+
+    row_cursor = 0
+    for row_idx, row_weights in enumerate(weight_rows):
+        row_len = row_base + (1 if row_idx < row_rem else 0)
+        col_cursor = 0
+        for col_idx, weight in enumerate(row_weights):
+            col_len = col_base + (1 if col_idx < col_rem else 0)
+            kernel[row_cursor : row_cursor + row_len, col_cursor : col_cursor + col_len] = float(weight)
+            col_cursor += col_len
+        row_cursor += row_len
+
+    kernel -= kernel.mean()
+    norm = float(np.linalg.norm(kernel))
+    if norm > 1e-6:
+        kernel /= norm
+    return kernel
+
+
+def apply_valid_2d_kernel(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    image = np.asarray(image, dtype=np.float32)
+    kernel = np.asarray(kernel, dtype=np.float32)
+    if image.ndim != 2 or kernel.ndim != 2:
+        raise ValueError(f"Expected 2D image/kernel, got image={image.shape}, kernel={kernel.shape}")
+
+    kh, kw = kernel.shape
+    if image.shape[0] < kh or image.shape[1] < kw:
+        return np.zeros((0, 0), dtype=np.float32)
+
+    try:
+        windows = np.lib.stride_tricks.sliding_window_view(image, (kh, kw))
+        response = np.einsum("ijkl,kl->ij", windows, kernel, optimize=True)
+        return response.astype(np.float32)
+    except AttributeError:
+        out_h = image.shape[0] - kh + 1
+        out_w = image.shape[1] - kw + 1
+        response = np.zeros((out_h, out_w), dtype=np.float32)
+        for row_idx in range(out_h):
+            for col_idx in range(out_w):
+                patch = image[row_idx : row_idx + kh, col_idx : col_idx + kw]
+                response[row_idx, col_idx] = float(np.sum(patch * kernel))
+        return response
 
 
 def extract_profile_summary_features(profile: np.ndarray, prefix: str) -> Dict[str, float]:
@@ -1894,7 +1979,7 @@ def extract_segment_difference_features(
     return features
 
 
-def extract_pair_haar_features(
+def extract_pair_haar_1d_features(
     left_repr: ChromosomeBandRepresentation,
     right_repr: ChromosomeBandRepresentation,
     kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
@@ -1964,6 +2049,127 @@ def extract_pair_haar_features(
     return features
 
 
+def extract_pair_haar_2d_features(
+    left_repr: ChromosomeBandRepresentation,
+    right_repr: ChromosomeBandRepresentation,
+    kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
+) -> Dict[str, float]:
+    features: Dict[str, float] = {}
+    left_band = np.asarray(left_repr.band_image, dtype=np.float32)
+    right_band = np.asarray(right_repr.band_image, dtype=np.float32)
+    right_band_reversed = right_band[::-1].copy()
+
+    features["band2d_direct_corr"] = safe_corrcoef(left_band.reshape(-1), right_band.reshape(-1))
+    features["band2d_reverse_corr"] = safe_corrcoef(left_band.reshape(-1), right_band_reversed.reshape(-1))
+    features["band2d_reverse_gain"] = features["band2d_reverse_corr"] - features["band2d_direct_corr"]
+    features["band2d_direct_l1"] = float(np.mean(np.abs(left_band - right_band)))
+    features["band2d_reverse_l1"] = float(np.mean(np.abs(left_band - right_band_reversed)))
+    features["band2d_reverse_l1_gain"] = features["band2d_direct_l1"] - features["band2d_reverse_l1"]
+
+    band_width = int(min(left_band.shape[1], right_band.shape[1]))
+    width_sizes = sorted(
+        {
+            min(max(4, band_width // 4), band_width),
+            min(max(8, band_width // 2), band_width),
+            band_width,
+        }
+    )
+
+    for height_size in kernel_sizes:
+        if height_size > left_band.shape[0]:
+            continue
+        for width_size in width_sizes:
+            if width_size > left_band.shape[1]:
+                continue
+            for kernel_name, kernel_weights in default_haar_2d_specifications():
+                row_segments = len(kernel_weights)
+                col_segments = len(kernel_weights[0]) if row_segments > 0 else 0
+                if height_size < row_segments or width_size < col_segments:
+                    continue
+
+                kernel = build_haar_kernel_2d(height=height_size, width=width_size, weights=kernel_weights)
+                left_response = apply_valid_2d_kernel(left_band, kernel)
+                right_response = apply_valid_2d_kernel(right_band, kernel)
+                reverse_response = apply_valid_2d_kernel(right_band_reversed, kernel)
+
+                left_flat = left_response.reshape(-1)
+                right_flat = right_response.reshape(-1)
+                reverse_flat = reverse_response.reshape(-1)
+                prefix = f"haar2d_{kernel_name}_h{height_size}_w{width_size}"
+                features.update(summarize_response(left_flat, f"{prefix}_left"))
+                features.update(summarize_response(right_flat, f"{prefix}_right"))
+                features.update(summarize_response(left_flat - right_flat, f"{prefix}_direct_diff"))
+                features.update(summarize_response(left_flat - reverse_flat, f"{prefix}_reverse_diff"))
+                features[f"{prefix}_direct_corr"] = safe_corrcoef(left_flat, right_flat)
+                features[f"{prefix}_reverse_corr"] = safe_corrcoef(left_flat, reverse_flat)
+                features[f"{prefix}_reverse_gain"] = (
+                    features[f"{prefix}_reverse_corr"] - features[f"{prefix}_direct_corr"]
+                )
+
+    return features
+
+
+def extract_pair_haar_features(
+    left_repr: ChromosomeBandRepresentation,
+    right_repr: ChromosomeBandRepresentation,
+    kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
+    feature_set: str = "1d",
+) -> Dict[str, float]:
+    normalized_feature_set = normalize_haar_feature_set(feature_set)
+    features: Dict[str, float] = {}
+    if normalized_feature_set in {"1d", "1d2d"}:
+        features.update(
+            extract_pair_haar_1d_features(
+                left_repr=left_repr,
+                right_repr=right_repr,
+                kernel_sizes=kernel_sizes,
+            )
+        )
+    if normalized_feature_set in {"2d", "1d2d"}:
+        features.update(
+            extract_pair_haar_2d_features(
+                left_repr=left_repr,
+                right_repr=right_repr,
+                kernel_sizes=kernel_sizes,
+            )
+        )
+    return features
+
+
+def build_haar_kernel_catalog(
+    kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
+    feature_set: str = "1d",
+    band_width: int = 32,
+) -> Dict[str, object]:
+    normalized_feature_set = normalize_haar_feature_set(feature_set)
+    catalog: Dict[str, object] = {
+        "feature_set": normalized_feature_set,
+        "kernel_sizes": [int(size) for size in kernel_sizes],
+    }
+    if normalized_feature_set in {"1d", "1d2d"}:
+        catalog["one_d_templates"] = [
+            {"name": name, "weights": [float(v) for v in weights]}
+            for name, weights in default_haar_specifications()
+        ]
+    if normalized_feature_set in {"2d", "1d2d"}:
+        width_sizes = sorted(
+            {
+                min(max(4, int(band_width) // 4), int(band_width)),
+                min(max(8, int(band_width) // 2), int(band_width)),
+                int(band_width),
+            }
+        )
+        catalog["two_d_templates"] = [
+            {
+                "name": name,
+                "weights": [[float(v) for v in row] for row in weights],
+            }
+            for name, weights in default_haar_2d_specifications()
+        ]
+        catalog["two_d_width_sizes"] = [int(size) for size in width_sizes]
+    return catalog
+
+
 def extract_pair_features_from_paths(
     left_path: str,
     right_path: str,
@@ -1972,6 +2178,7 @@ def extract_pair_features_from_paths(
     kernel_sizes: Sequence[int] = (4, 8, 16, 32, 64),
     representation_version: str = "v1",
     pair_orientation_align: bool = False,
+    feature_set: str = "1d",
 ) -> Dict[str, float]:
     left_gray = load_grayscale_image(left_path)
     right_gray = load_grayscale_image(right_path)
@@ -2000,6 +2207,7 @@ def extract_pair_features_from_paths(
         left_repr=left_repr,
         right_repr=right_repr,
         kernel_sizes=kernel_sizes,
+        feature_set=feature_set,
     )
 
 
