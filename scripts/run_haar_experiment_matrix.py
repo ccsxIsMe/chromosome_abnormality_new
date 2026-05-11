@@ -31,6 +31,11 @@ def parse_args():
     parser.add_argument("--band_width", type=int, default=32)
     parser.add_argument("--kernel_sizes", default="4,8,16,32,64")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--skip_existing",
+        action="store_true",
+        help="Skip experiments whose results.yaml already exists.",
+    )
     return parser.parse_args()
 
 
@@ -251,6 +256,34 @@ def main():
             ),
         },
         {
+            "name": "fusion_raw_2d_all",
+            "cmd": fusion_command(
+                args.raw_p16_config,
+                args.raw_p16_ckpt,
+                args.raw_train_csv,
+                args.raw_val_csv,
+                args.raw_test_csv,
+                str(output_root / "fusion_raw_2d_all"),
+                representation_version="v2",
+                feature_set="2d",
+                feature_select_mode="all",
+            ),
+        },
+        {
+            "name": "fusion_raw_1d2d_all",
+            "cmd": fusion_command(
+                args.raw_p16_config,
+                args.raw_p16_ckpt,
+                args.raw_train_csv,
+                args.raw_val_csv,
+                args.raw_test_csv,
+                str(output_root / "fusion_raw_1d2d_all"),
+                representation_version="v2",
+                feature_set="1d2d",
+                feature_select_mode="all",
+            ),
+        },
+        {
             "name": "fusion_straight_1d_all",
             "cmd": fusion_command(
                 args.straight_p16_config,
@@ -278,12 +311,44 @@ def main():
                 feature_select_mode="topk",
             ),
         },
+        {
+            "name": "fusion_straight_2d_all",
+            "cmd": fusion_command(
+                args.straight_p16_config,
+                args.straight_p16_ckpt,
+                args.straight_train_csv,
+                args.straight_val_csv,
+                args.straight_test_csv,
+                str(output_root / "fusion_straight_2d_all"),
+                representation_version="v3",
+                feature_set="2d",
+                feature_select_mode="all",
+            ),
+        },
+        {
+            "name": "fusion_straight_1d2d_all",
+            "cmd": fusion_command(
+                args.straight_p16_config,
+                args.straight_p16_ckpt,
+                args.straight_train_csv,
+                args.straight_val_csv,
+                args.straight_test_csv,
+                str(output_root / "fusion_straight_1d2d_all"),
+                representation_version="v3",
+                feature_set="1d2d",
+                feature_select_mode="all",
+            ),
+        },
     ]
 
     manifest_lines = ["name,results_path"]
     for spec in experiment_specs:
-        run_cmd(spec["cmd"])
-        manifest_lines.append(f"{spec['name']},{(output_root / spec['name'] / 'results.yaml').as_posix()}")
+        results_path = output_root / spec["name"] / "results.yaml"
+        if args.skip_existing and results_path.exists():
+            print(f"\n[Skip] {spec['name']} -> {results_path}")
+        else:
+            run_cmd(spec["cmd"])
+        manifest_lines.append(f"{spec['name']},{results_path.as_posix()}")
 
     manifest_path = output_root / "haar_experiment_manifest.csv"
     manifest_path.write_text("\n".join(manifest_lines), encoding="utf-8")

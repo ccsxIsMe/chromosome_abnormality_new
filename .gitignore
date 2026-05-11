@@ -20,6 +20,7 @@ saved_model/
 *.png
 outputs/experiments/**/*.csv
 outputs/experiments/**/*.npz
+outputs/reports/
 
 outputs/experiments/**/*.csv
 outputs/experiments/**/*.npz
