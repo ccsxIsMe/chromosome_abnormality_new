@@ -1,0 +1,714 @@
+method: haar_like_adaboost_pair_baseline
+task: supervised_pair_abnormality
+train_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/train.csv
+val_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/val.csv
+test_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/test.csv
+split_summary:
+  train_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/train.csv
+  val_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/val.csv
+  test_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/test.csv
+  train_has_case_id: true
+  train_num_cases: 20
+  val_has_case_id: true
+  val_num_cases: 6
+  test_has_case_id: true
+  test_num_cases: 6
+  case_isolation_checkable: true
+  train_val_overlap_cases: []
+  train_test_overlap_cases: []
+  val_test_overlap_cases: []
+  num_train_val_overlap: 0
+  num_train_test_overlap: 0
+  num_val_test_overlap: 0
+  is_case_isolated: true
+feature_settings:
+  profile_length: 128
+  band_width: 32
+  kernel_sizes:
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  representation_version: v3
+  pair_orientation_align: true
+  feature_set: 1d
+  feature_select_mode: topk
+  feature_topk: 128
+  num_feature_columns: 128
+  haar_kernel_catalog:
+    feature_set: 1d
+    kernel_sizes:
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+    one_d_templates:
+    - name: step
+      weights:
+      - 1.0
+      - -1.0
+    - name: reverse_step
+      weights:
+      - -1.0
+      - 1.0
+    - name: peak
+      weights:
+      - 1.0
+      - -2.0
+      - 1.0
+    - name: valley
+      weights:
+      - -1.0
+      - 2.0
+      - -1.0
+    - name: edge_triplet
+      weights:
+      - 1.0
+      - 0.0
+      - -1.0
+model_settings:
+  classifier: AdaBoostClassifier
+  n_estimators: 200
+  learning_rate: 0.5
+  weak_learner: DecisionTreeClassifier
+  weak_learner_max_depth: 1
+  seed: 42
+val_metrics_05:
+  auroc: 0.6094470839358259
+  auprc: 0.07071882654021261
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2256
+    fp: 0
+    fn: 103
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9563374311148792
+    recall: 1.0
+    f1: 0.9776814734561213
+    support: 2256
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 103
+best_threshold: 0.2659019194543313
+best_threshold_score: 0.11464968152866244
+best_threshold_stats:
+  precision: 0.06436233611442194
+  recall: 0.5242718446601942
+  f1: 0.11464968152866244
+  balanced_acc: 0.5881554258761963
+test_metrics_05:
+  auroc: 0.48499463166279916
+  auprc: 0.04689255205471196
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2221
+    fp: 0
+    fn: 104
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9552688172043011
+    recall: 1.0
+    f1: 0.9771227452705675
+    support: 2221
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 104
+test_metrics_best:
+  auroc: 0.48499463166279916
+  auprc: 0.04689255205471196
+  f1: 0.08651911468812877
+  precision_abnormal: 0.048314606741573035
+  recall_abnormal: 0.41346153846153844
+  balanced_acc: 0.5160508953001073
+  confusion_matrix:
+    tn: 1374
+    fp: 847
+    fn: 61
+    tp: 43
+  normal:
+    acc: 0.6186402521386762
+    precision: 0.9574912891986063
+    recall: 0.6186402521386762
+    f1: 0.7516411378555798
+    support: 2221
+  abnormal:
+    acc: 0.41346153846153844
+    precision: 0.048314606741573035
+    recall: 0.41346153846153844
+    f1: 0.08651911468812877
+    support: 104
+top_feature_importance:
+- feature: right_foreground_area
+  importance: 0.2826510397996697
+- feature: foreground_area_ratio
+  importance: 0.26257454163461846
+- feature: seg8_0_reverse_gain
+  importance: 0.07402814903397313
+- feature: haar_peak_k4_right_std
+  importance: 0.07398003555311276
+- feature: haar_valley_k4_right_std
+  importance: 0.07016622197618477
+- feature: right_valid_profile_fraction
+  importance: 0.052344783487511974
+- feature: haar_step_k64_right_max_abs
+  importance: 0.03774650945846525
+- feature: abs_major_axis_angle_diff
+  importance: 0.01597254582245823
+- feature: haar_reverse_step_k64_right_max_abs
+  importance: 0.015367400597612409
+- feature: haar_step_k32_right_max
+  importance: 0.013537472015104747
+- feature: seg8_7_direct_l1
+  importance: 0.013029167984575953
+- feature: haar_edge_triplet_k32_left_min
+  importance: 0.01259315240394262
+- feature: haar_valley_k8_reverse_diff_max_abs
+  importance: 0.01246049480109344
+- feature: haar_valley_k8_right_max
+  importance: 0.012330649018590625
+- feature: left_foreground_area
+  importance: 0.011366190113111982
+- feature: haar_edge_triplet_k32_reverse_diff_max
+  importance: 0.011220597567002374
+- feature: haar_valley_k64_left_max_abs
+  importance: 0.009970739675158406
+- feature: right_profile_min
+  importance: 0.008220097397237702
+- feature: haar_peak_k64_left_max_abs
+  importance: 0.006101985897861391
+- feature: haar_peak_k4_right_mean
+  importance: 0.004338225762714022
+- feature: haar_step_k32_reverse_diff_max
+  importance: 0.0
+- feature: haar_reverse_step_k32_reverse_diff_min
+  importance: 0.0
+- feature: haar_edge_triplet_k16_right_mean_abs
+  importance: 0.0
+- feature: haar_edge_triplet_k16_right_std
+  importance: 0.0
+- feature: haar_peak_k4_right_min
+  importance: 0.0
+- feature: haar_valley_k4_right_max
+  importance: 0.0
+- feature: haar_step_k16_right_mean_abs
+  importance: 0.0
+- feature: haar_reverse_step_k16_right_mean_abs
+  importance: 0.0
+- feature: haar_peak_k16_right_max_abs
+  importance: 0.0
+- feature: haar_valley_k16_right_max_abs
+  importance: 0.0
+- feature: haar_peak_k8_reverse_diff_max_abs
+  importance: 0.0
+- feature: seg4_3_direct_l1
+  importance: 0.0
+- feature: haar_step_k32_left_min
+  importance: 0.0
+- feature: haar_reverse_step_k32_left_max
+  importance: 0.0
+- feature: haar_peak_k16_right_min
+  importance: 0.0
+- feature: haar_valley_k16_right_max
+  importance: 0.0
+- feature: haar_peak_k8_right_min
+  importance: 0.0
+- feature: haar_peak_k32_right_std
+  importance: 0.0
+- feature: haar_valley_k32_right_std
+  importance: 0.0
+- feature: haar_peak_k32_right_mean_abs
+  importance: 0.0
+- feature: haar_valley_k32_right_mean_abs
+  importance: 0.0
+- feature: haar_step_k16_right_std
+  importance: 0.0
+- feature: haar_reverse_step_k16_right_std
+  importance: 0.0
+- feature: haar_step_k8_right_min
+  importance: 0.0
+- feature: haar_reverse_step_k8_right_max
+  importance: 0.0
+- feature: haar_step_k32_left_std
+  importance: 0.0
+- feature: haar_reverse_step_k32_left_std
+  importance: 0.0
+- feature: haar_peak_k8_right_std
+  importance: 0.0
+- feature: haar_valley_k8_right_std
+  importance: 0.0
+- feature: haar_peak_k64_left_min
+  importance: 0.0
+selected_feature_columns:
+- foreground_area_ratio
+- right_foreground_area
+- right_valid_profile_fraction
+- haar_step_k32_reverse_diff_max
+- haar_reverse_step_k32_reverse_diff_min
+- haar_edge_triplet_k16_right_mean_abs
+- haar_edge_triplet_k16_right_std
+- left_foreground_area
+- haar_edge_triplet_k32_reverse_diff_max
+- right_profile_min
+- seg8_7_direct_l1
+- haar_peak_k4_right_min
+- haar_valley_k4_right_max
+- haar_step_k16_right_mean_abs
+- haar_reverse_step_k16_right_mean_abs
+- haar_peak_k16_right_max_abs
+- haar_valley_k16_right_max_abs
+- haar_peak_k8_reverse_diff_max_abs
+- haar_valley_k8_reverse_diff_max_abs
+- seg4_3_direct_l1
+- haar_step_k32_left_min
+- haar_reverse_step_k32_left_max
+- haar_peak_k16_right_min
+- haar_valley_k16_right_max
+- haar_edge_triplet_k32_left_min
+- haar_peak_k8_right_min
+- haar_valley_k8_right_max
+- haar_peak_k32_right_std
+- haar_valley_k32_right_std
+- haar_peak_k32_right_mean_abs
+- haar_valley_k32_right_mean_abs
+- haar_step_k16_right_std
+- haar_reverse_step_k16_right_std
+- haar_step_k8_right_min
+- haar_reverse_step_k8_right_max
+- haar_step_k32_left_std
+- haar_reverse_step_k32_left_std
+- haar_peak_k8_right_std
+- haar_valley_k8_right_std
+- haar_peak_k64_left_min
+- haar_valley_k64_left_max
+- haar_step_k4_right_min
+- haar_reverse_step_k4_right_max
+- haar_edge_triplet_k4_right_min
+- haar_edge_triplet_k32_left_std
+- haar_edge_triplet_k8_right_min
+- haar_peak_k4_right_mean
+- haar_valley_k4_right_mean
+- haar_step_k32_left_mean_abs
+- haar_reverse_step_k32_left_mean_abs
+- haar_peak_k32_right_min
+- haar_valley_k32_right_max
+- seg8_0_reverse_gain
+- haar_peak_k64_left_max_abs
+- haar_valley_k64_left_max_abs
+- haar_step_k64_right_max_abs
+- haar_reverse_step_k64_right_max_abs
+- seg8_0_reverse_l1
+- haar_edge_triplet_k32_left_mean_abs
+- haar_step_k32_left_max
+- haar_reverse_step_k32_left_min
+- haar_peak_k8_right_mean_abs
+- haar_valley_k8_right_mean_abs
+- haar_edge_triplet_k8_right_max
+- haar_step_k32_reverse_diff_max_abs
+- haar_reverse_step_k32_reverse_diff_max_abs
+- haar_peak_k8_reverse_diff_min
+- haar_valley_k8_reverse_diff_max
+- haar_peak_k64_left_std
+- haar_valley_k64_left_std
+- right_profile_diff_max_abs
+- haar_step_k8_right_max
+- haar_reverse_step_k8_right_min
+- haar_peak_k8_reverse_diff_max
+- haar_valley_k8_reverse_diff_min
+- haar_peak_k64_left_mean_abs
+- haar_valley_k64_left_mean_abs
+- abs_major_axis_angle_diff
+- haar_step_k8_right_max_abs
+- haar_reverse_step_k8_right_max_abs
+- haar_edge_triplet_k8_right_max_abs
+- haar_peak_k4_right_max_abs
+- haar_valley_k4_right_max_abs
+- haar_peak_k4_right_std
+- haar_valley_k4_right_std
+- haar_step_k32_direct_diff_min
+- haar_reverse_step_k32_direct_diff_max
+- haar_edge_triplet_k32_left_max_abs
+- haar_edge_triplet_k4_reverse_diff_min
+- haar_step_k4_right_max
+- haar_reverse_step_k4_right_min
+- haar_edge_triplet_k4_right_max
+- haar_step_k32_reverse_diff_std
+- haar_reverse_step_k32_reverse_diff_std
+- haar_peak_k16_left_mean_abs
+- haar_valley_k16_left_mean_abs
+- haar_step_k8_reverse_diff_min
+- haar_reverse_step_k8_reverse_diff_max
+- left_profile_min
+- haar_step_k32_right_max
+- haar_reverse_step_k32_right_min
+- haar_step_k32_left_max_abs
+- haar_reverse_step_k32_left_max_abs
+- haar_peak_k32_reverse_diff_min
+- haar_valley_k32_reverse_diff_max
+- haar_step_k4_right_mean
+- haar_reverse_step_k4_right_mean
+- haar_peak_k4_reverse_diff_max_abs
+- haar_valley_k4_reverse_diff_max_abs
+- haar_step_k4_reverse_diff_min
+- haar_reverse_step_k4_reverse_diff_max
+- haar_peak_k32_right_max_abs
+- haar_valley_k32_right_max_abs
+- right_profile_range
+- haar_peak_k4_direct_corr
+- haar_valley_k4_direct_corr
+- haar_peak_k16_left_std
+- haar_valley_k16_left_std
+- haar_edge_triplet_k64_right_max_abs
+- haar_peak_k8_right_max_abs
+- haar_valley_k8_right_max_abs
+- haar_edge_triplet_k8_left_max
+- haar_peak_k8_direct_corr
+- haar_valley_k8_direct_corr
+- haar_peak_k8_right_max
+- haar_valley_k8_right_min
+- haar_edge_triplet_k4_right_mean
+- haar_edge_triplet_k8_reverse_diff_min
+train_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 547
+  normal_count: 487
+  abnormal_count: 60
+- chromosome_id: '10'
+  count: 547
+  normal_count: 515
+  abnormal_count: 32
+- chromosome_id: '11'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '12'
+  count: 547
+  normal_count: 516
+  abnormal_count: 31
+- chromosome_id: '13'
+  count: 547
+  normal_count: 523
+  abnormal_count: 24
+- chromosome_id: '14'
+  count: 547
+  normal_count: 513
+  abnormal_count: 34
+- chromosome_id: '15'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '16'
+  count: 547
+  normal_count: 519
+  abnormal_count: 28
+- chromosome_id: '17'
+  count: 547
+  normal_count: 514
+  abnormal_count: 33
+- chromosome_id: '18'
+  count: 547
+  normal_count: 521
+  abnormal_count: 26
+- chromosome_id: '19'
+  count: 547
+  normal_count: 527
+  abnormal_count: 20
+- chromosome_id: '2'
+  count: 547
+  normal_count: 536
+  abnormal_count: 11
+- chromosome_id: '20'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '21'
+  count: 547
+  normal_count: 522
+  abnormal_count: 25
+- chromosome_id: '22'
+  count: 546
+  normal_count: 525
+  abnormal_count: 21
+- chromosome_id: '3'
+  count: 547
+  normal_count: 511
+  abnormal_count: 36
+- chromosome_id: '4'
+  count: 547
+  normal_count: 531
+  abnormal_count: 16
+- chromosome_id: '5'
+  count: 547
+  normal_count: 517
+  abnormal_count: 30
+- chromosome_id: '6'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '7'
+  count: 547
+  normal_count: 517
+  abnormal_count: 30
+- chromosome_id: '8'
+  count: 547
+  normal_count: 513
+  abnormal_count: 34
+- chromosome_id: '9'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: X
+  count: 272
+  normal_count: 272
+  abnormal_count: 0
+val_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 103
+  normal_count: 82
+  abnormal_count: 21
+- chromosome_id: '10'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '11'
+  count: 103
+  normal_count: 76
+  abnormal_count: 27
+- chromosome_id: '12'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '13'
+  count: 103
+  normal_count: 91
+  abnormal_count: 12
+- chromosome_id: '14'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '15'
+  count: 103
+  normal_count: 78
+  abnormal_count: 25
+- chromosome_id: '16'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '17'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '18'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '19'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '2'
+  count: 103
+  normal_count: 93
+  abnormal_count: 10
+- chromosome_id: '20'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '21'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '22'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '3'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '4'
+  count: 103
+  normal_count: 95
+  abnormal_count: 8
+- chromosome_id: '5'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '6'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '7'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '8'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '9'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: X
+  count: 93
+  normal_count: 93
+  abnormal_count: 0
+test_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '10'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '11'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '12'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '13'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '14'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '15'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '16'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '17'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '18'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '19'
+  count: 104
+  normal_count: 100
+  abnormal_count: 4
+- chromosome_id: '2'
+  count: 104
+  normal_count: 94
+  abnormal_count: 10
+- chromosome_id: '20'
+  count: 104
+  normal_count: 72
+  abnormal_count: 32
+- chromosome_id: '21'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '22'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '3'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '4'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '5'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '6'
+  count: 104
+  normal_count: 69
+  abnormal_count: 35
+- chromosome_id: '7'
+  count: 104
+  normal_count: 98
+  abnormal_count: 6
+- chromosome_id: '8'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '9'
+  count: 104
+  normal_count: 87
+  abnormal_count: 17
+- chromosome_id: X
+  count: 37
+  normal_count: 37
+  abnormal_count: 0
+test_by_subtype_best_threshold:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 1.0
+  mean_score: 0.2772522178398496
+  min_score: 0.27049082867800944
+  max_score: 0.28510905421748656
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.125
+  mean_score: 0.24076552150872244
+  min_score: 0.20142832506358133
+  max_score: 0.2836368444076948
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.9
+  mean_score: 0.2858119670334728
+  min_score: 0.21845936927609966
+  max_score: 0.311865889790718
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 0.42857142857142855
+  mean_score: 0.26127596083979143
+  min_score: 0.22852093419347805
+  max_score: 0.3297071800824311
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 0.5
+  mean_score: 0.25858109532475476
+  min_score: 0.22573444313984847
+  max_score: 0.2761898942959801
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.47058823529411764
+  mean_score: 0.2643226641373452
+  min_score: 0.22850397598857955
+  max_score: 0.2862640494870828

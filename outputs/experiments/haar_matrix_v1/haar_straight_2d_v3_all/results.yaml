@@ -1,0 +1,2622 @@
+method: haar_like_adaboost_pair_baseline
+task: supervised_pair_abnormality
+train_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/train.csv
+val_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/val.csv
+test_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/test.csv
+split_summary:
+  train_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/train.csv
+  val_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/val.csv
+  test_csv: data_protocol/p1_pair_case_isolated_straight_out_v1/test.csv
+  train_has_case_id: true
+  train_num_cases: 20
+  val_has_case_id: true
+  val_num_cases: 6
+  test_has_case_id: true
+  test_num_cases: 6
+  case_isolation_checkable: true
+  train_val_overlap_cases: []
+  train_test_overlap_cases: []
+  val_test_overlap_cases: []
+  num_train_val_overlap: 0
+  num_train_test_overlap: 0
+  num_val_test_overlap: 0
+  is_case_isolated: true
+feature_settings:
+  profile_length: 128
+  band_width: 32
+  kernel_sizes:
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  representation_version: v3
+  pair_orientation_align: true
+  feature_set: 2d
+  feature_select_mode: all
+  feature_topk: 128
+  num_feature_columns: 2031
+  haar_kernel_catalog:
+    feature_set: 2d
+    kernel_sizes:
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+    two_d_templates:
+    - name: axial_step
+      weights:
+      - - 1.0
+      - - -1.0
+    - name: lateral_step
+      weights:
+      - - 1.0
+        - -1.0
+    - name: checker
+      weights:
+      - - 1.0
+        - -1.0
+      - - -1.0
+        - 1.0
+    - name: axial_center_surround
+      weights:
+      - - 1.0
+      - - -2.0
+      - - 1.0
+    - name: lateral_center_surround
+      weights:
+      - - 1.0
+        - -2.0
+        - 1.0
+    two_d_width_sizes:
+    - 8
+    - 16
+    - 32
+model_settings:
+  classifier: AdaBoostClassifier
+  n_estimators: 200
+  learning_rate: 0.5
+  weak_learner: DecisionTreeClassifier
+  weak_learner_max_depth: 1
+  seed: 42
+val_metrics_05:
+  auroc: 0.5402206844315913
+  auprc: 0.051573321840672766
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2256
+    fp: 0
+    fn: 103
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9563374311148792
+    recall: 1.0
+    f1: 0.9776814734561213
+    support: 2256
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 103
+best_threshold: 0.2898756428332359
+best_threshold_score: 0.10465116279069767
+best_threshold_stats:
+  precision: 0.06537530266343826
+  recall: 0.2621359223300971
+  f1: 0.10465116279069767
+  balanced_acc: 0.5455183157749777
+test_metrics_05:
+  auroc: 0.5012468396079383
+  auprc: 0.05350266092391784
+  f1: 0.0
+  precision_abnormal: 0.0
+  recall_abnormal: 0.0
+  balanced_acc: 0.5
+  confusion_matrix:
+    tn: 2221
+    fp: 0
+    fn: 104
+    tp: 0
+  normal:
+    acc: 1.0
+    precision: 0.9552688172043011
+    recall: 1.0
+    f1: 0.9771227452705675
+    support: 2221
+  abnormal:
+    acc: 0.0
+    precision: 0.0
+    recall: 0.0
+    f1: 0.0
+    support: 104
+test_metrics_best:
+  auroc: 0.5012468396079383
+  auprc: 0.05350266092391784
+  f1: 0.08048289738430583
+  precision_abnormal: 0.05089058524173028
+  recall_abnormal: 0.19230769230769232
+  balanced_acc: 0.512182662002563
+  confusion_matrix:
+    tn: 1848
+    fp: 373
+    fn: 84
+    tp: 20
+  normal:
+    acc: 0.8320576316974336
+    precision: 0.9565217391304348
+    recall: 0.8320576316974336
+    f1: 0.8899590657356129
+    support: 2221
+  abnormal:
+    acc: 0.19230769230769232
+    precision: 0.05089058524173028
+    recall: 0.19230769230769232
+    f1: 0.08048289738430583
+    support: 104
+top_feature_importance:
+- feature: haar2d_lateral_step_h4_w8_reverse_diff_min
+  importance: 0.24379022116516125
+- feature: haar2d_lateral_center_surround_h32_w8_reverse_diff_mean_abs
+  importance: 0.23108814531674748
+- feature: haar2d_lateral_center_surround_h16_w32_right_mean
+  importance: 0.10383702634605725
+- feature: haar2d_lateral_center_surround_h8_w16_right_mean
+  importance: 0.08667276480658437
+- feature: haar2d_lateral_step_h8_w8_direct_corr
+  importance: 0.06551174409809774
+- feature: haar2d_axial_step_h32_w16_left_max
+  importance: 0.035319545261954285
+- feature: haar2d_axial_center_surround_h64_w8_reverse_corr
+  importance: 0.03213424236251544
+- feature: haar2d_checker_h32_w32_left_mean
+  importance: 0.023428424490885783
+- feature: haar2d_lateral_step_h32_w16_reverse_gain
+  importance: 0.022229388134860494
+- feature: haar2d_lateral_center_surround_h64_w32_right_min
+  importance: 0.020720360816321136
+- feature: haar2d_axial_step_h32_w16_left_min
+  importance: 0.01909461040826013
+- feature: haar2d_checker_h16_w8_direct_diff_min
+  importance: 0.013376067350122638
+- feature: haar2d_checker_h16_w32_direct_diff_max
+  importance: 0.013154314655991647
+- feature: haar2d_lateral_center_surround_h16_w16_right_mean
+  importance: 0.01266727962396063
+- feature: haar2d_lateral_step_h16_w8_direct_corr
+  importance: 0.01135290178444643
+- feature: haar2d_lateral_step_h4_w32_reverse_corr
+  importance: 0.010579245954495485
+- feature: haar2d_lateral_center_surround_h32_w32_right_mean
+  importance: 0.00993054669925343
+- feature: haar2d_axial_center_surround_h64_w16_left_mean_abs
+  importance: 0.009682973438009822
+- feature: haar2d_lateral_step_h32_w8_reverse_diff_std
+  importance: 0.009359065394958406
+- feature: haar2d_checker_h4_w8_right_min
+  importance: 0.008864336048214166
+- feature: haar2d_axial_center_surround_h64_w16_reverse_diff_std
+  importance: 0.006683935485054423
+- feature: haar2d_lateral_center_surround_h64_w32_direct_diff_max
+  importance: 0.0062567931900149604
+- feature: haar2d_checker_h4_w16_right_std
+  importance: 0.004266067168032607
+- feature: band2d_direct_corr
+  importance: 0.0
+- feature: band2d_reverse_corr
+  importance: 0.0
+- feature: band2d_reverse_gain
+  importance: 0.0
+- feature: band2d_direct_l1
+  importance: 0.0
+- feature: band2d_reverse_l1
+  importance: 0.0
+- feature: band2d_reverse_l1_gain
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_mean
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_std
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_max
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_min
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_mean_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_left_max_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_mean
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_std
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_max
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_min
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_mean_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_right_max_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_mean
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_std
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_max
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_min
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_mean_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_direct_diff_max_abs
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_reverse_diff_mean
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_reverse_diff_std
+  importance: 0.0
+- feature: haar2d_axial_step_h4_w8_reverse_diff_max
+  importance: 0.0
+selected_feature_columns:
+- band2d_direct_corr
+- band2d_reverse_corr
+- band2d_reverse_gain
+- band2d_direct_l1
+- band2d_reverse_l1
+- band2d_reverse_l1_gain
+- haar2d_axial_step_h4_w8_left_mean
+- haar2d_axial_step_h4_w8_left_std
+- haar2d_axial_step_h4_w8_left_max
+- haar2d_axial_step_h4_w8_left_min
+- haar2d_axial_step_h4_w8_left_mean_abs
+- haar2d_axial_step_h4_w8_left_max_abs
+- haar2d_axial_step_h4_w8_right_mean
+- haar2d_axial_step_h4_w8_right_std
+- haar2d_axial_step_h4_w8_right_max
+- haar2d_axial_step_h4_w8_right_min
+- haar2d_axial_step_h4_w8_right_mean_abs
+- haar2d_axial_step_h4_w8_right_max_abs
+- haar2d_axial_step_h4_w8_direct_diff_mean
+- haar2d_axial_step_h4_w8_direct_diff_std
+- haar2d_axial_step_h4_w8_direct_diff_max
+- haar2d_axial_step_h4_w8_direct_diff_min
+- haar2d_axial_step_h4_w8_direct_diff_mean_abs
+- haar2d_axial_step_h4_w8_direct_diff_max_abs
+- haar2d_axial_step_h4_w8_reverse_diff_mean
+- haar2d_axial_step_h4_w8_reverse_diff_std
+- haar2d_axial_step_h4_w8_reverse_diff_max
+- haar2d_axial_step_h4_w8_reverse_diff_min
+- haar2d_axial_step_h4_w8_reverse_diff_mean_abs
+- haar2d_axial_step_h4_w8_reverse_diff_max_abs
+- haar2d_axial_step_h4_w8_direct_corr
+- haar2d_axial_step_h4_w8_reverse_corr
+- haar2d_axial_step_h4_w8_reverse_gain
+- haar2d_lateral_step_h4_w8_left_mean
+- haar2d_lateral_step_h4_w8_left_std
+- haar2d_lateral_step_h4_w8_left_max
+- haar2d_lateral_step_h4_w8_left_min
+- haar2d_lateral_step_h4_w8_left_mean_abs
+- haar2d_lateral_step_h4_w8_left_max_abs
+- haar2d_lateral_step_h4_w8_right_mean
+- haar2d_lateral_step_h4_w8_right_std
+- haar2d_lateral_step_h4_w8_right_max
+- haar2d_lateral_step_h4_w8_right_min
+- haar2d_lateral_step_h4_w8_right_mean_abs
+- haar2d_lateral_step_h4_w8_right_max_abs
+- haar2d_lateral_step_h4_w8_direct_diff_mean
+- haar2d_lateral_step_h4_w8_direct_diff_std
+- haar2d_lateral_step_h4_w8_direct_diff_max
+- haar2d_lateral_step_h4_w8_direct_diff_min
+- haar2d_lateral_step_h4_w8_direct_diff_mean_abs
+- haar2d_lateral_step_h4_w8_direct_diff_max_abs
+- haar2d_lateral_step_h4_w8_reverse_diff_mean
+- haar2d_lateral_step_h4_w8_reverse_diff_std
+- haar2d_lateral_step_h4_w8_reverse_diff_max
+- haar2d_lateral_step_h4_w8_reverse_diff_min
+- haar2d_lateral_step_h4_w8_reverse_diff_mean_abs
+- haar2d_lateral_step_h4_w8_reverse_diff_max_abs
+- haar2d_lateral_step_h4_w8_direct_corr
+- haar2d_lateral_step_h4_w8_reverse_corr
+- haar2d_lateral_step_h4_w8_reverse_gain
+- haar2d_checker_h4_w8_left_mean
+- haar2d_checker_h4_w8_left_std
+- haar2d_checker_h4_w8_left_max
+- haar2d_checker_h4_w8_left_min
+- haar2d_checker_h4_w8_left_mean_abs
+- haar2d_checker_h4_w8_left_max_abs
+- haar2d_checker_h4_w8_right_mean
+- haar2d_checker_h4_w8_right_std
+- haar2d_checker_h4_w8_right_max
+- haar2d_checker_h4_w8_right_min
+- haar2d_checker_h4_w8_right_mean_abs
+- haar2d_checker_h4_w8_right_max_abs
+- haar2d_checker_h4_w8_direct_diff_mean
+- haar2d_checker_h4_w8_direct_diff_std
+- haar2d_checker_h4_w8_direct_diff_max
+- haar2d_checker_h4_w8_direct_diff_min
+- haar2d_checker_h4_w8_direct_diff_mean_abs
+- haar2d_checker_h4_w8_direct_diff_max_abs
+- haar2d_checker_h4_w8_reverse_diff_mean
+- haar2d_checker_h4_w8_reverse_diff_std
+- haar2d_checker_h4_w8_reverse_diff_max
+- haar2d_checker_h4_w8_reverse_diff_min
+- haar2d_checker_h4_w8_reverse_diff_mean_abs
+- haar2d_checker_h4_w8_reverse_diff_max_abs
+- haar2d_checker_h4_w8_direct_corr
+- haar2d_checker_h4_w8_reverse_corr
+- haar2d_checker_h4_w8_reverse_gain
+- haar2d_axial_center_surround_h4_w8_left_mean
+- haar2d_axial_center_surround_h4_w8_left_std
+- haar2d_axial_center_surround_h4_w8_left_max
+- haar2d_axial_center_surround_h4_w8_left_min
+- haar2d_axial_center_surround_h4_w8_left_mean_abs
+- haar2d_axial_center_surround_h4_w8_left_max_abs
+- haar2d_axial_center_surround_h4_w8_right_mean
+- haar2d_axial_center_surround_h4_w8_right_std
+- haar2d_axial_center_surround_h4_w8_right_max
+- haar2d_axial_center_surround_h4_w8_right_min
+- haar2d_axial_center_surround_h4_w8_right_mean_abs
+- haar2d_axial_center_surround_h4_w8_right_max_abs
+- haar2d_axial_center_surround_h4_w8_direct_diff_mean
+- haar2d_axial_center_surround_h4_w8_direct_diff_std
+- haar2d_axial_center_surround_h4_w8_direct_diff_max
+- haar2d_axial_center_surround_h4_w8_direct_diff_min
+- haar2d_axial_center_surround_h4_w8_direct_diff_mean_abs
+- haar2d_axial_center_surround_h4_w8_direct_diff_max_abs
+- haar2d_axial_center_surround_h4_w8_reverse_diff_mean
+- haar2d_axial_center_surround_h4_w8_reverse_diff_std
+- haar2d_axial_center_surround_h4_w8_reverse_diff_max
+- haar2d_axial_center_surround_h4_w8_reverse_diff_min
+- haar2d_axial_center_surround_h4_w8_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h4_w8_reverse_diff_max_abs
+- haar2d_axial_center_surround_h4_w8_direct_corr
+- haar2d_axial_center_surround_h4_w8_reverse_corr
+- haar2d_axial_center_surround_h4_w8_reverse_gain
+- haar2d_lateral_center_surround_h4_w8_left_mean
+- haar2d_lateral_center_surround_h4_w8_left_std
+- haar2d_lateral_center_surround_h4_w8_left_max
+- haar2d_lateral_center_surround_h4_w8_left_min
+- haar2d_lateral_center_surround_h4_w8_left_mean_abs
+- haar2d_lateral_center_surround_h4_w8_left_max_abs
+- haar2d_lateral_center_surround_h4_w8_right_mean
+- haar2d_lateral_center_surround_h4_w8_right_std
+- haar2d_lateral_center_surround_h4_w8_right_max
+- haar2d_lateral_center_surround_h4_w8_right_min
+- haar2d_lateral_center_surround_h4_w8_right_mean_abs
+- haar2d_lateral_center_surround_h4_w8_right_max_abs
+- haar2d_lateral_center_surround_h4_w8_direct_diff_mean
+- haar2d_lateral_center_surround_h4_w8_direct_diff_std
+- haar2d_lateral_center_surround_h4_w8_direct_diff_max
+- haar2d_lateral_center_surround_h4_w8_direct_diff_min
+- haar2d_lateral_center_surround_h4_w8_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w8_direct_diff_max_abs
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_mean
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_std
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_max
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_min
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w8_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h4_w8_direct_corr
+- haar2d_lateral_center_surround_h4_w8_reverse_corr
+- haar2d_lateral_center_surround_h4_w8_reverse_gain
+- haar2d_axial_step_h4_w16_left_mean
+- haar2d_axial_step_h4_w16_left_std
+- haar2d_axial_step_h4_w16_left_max
+- haar2d_axial_step_h4_w16_left_min
+- haar2d_axial_step_h4_w16_left_mean_abs
+- haar2d_axial_step_h4_w16_left_max_abs
+- haar2d_axial_step_h4_w16_right_mean
+- haar2d_axial_step_h4_w16_right_std
+- haar2d_axial_step_h4_w16_right_max
+- haar2d_axial_step_h4_w16_right_min
+- haar2d_axial_step_h4_w16_right_mean_abs
+- haar2d_axial_step_h4_w16_right_max_abs
+- haar2d_axial_step_h4_w16_direct_diff_mean
+- haar2d_axial_step_h4_w16_direct_diff_std
+- haar2d_axial_step_h4_w16_direct_diff_max
+- haar2d_axial_step_h4_w16_direct_diff_min
+- haar2d_axial_step_h4_w16_direct_diff_mean_abs
+- haar2d_axial_step_h4_w16_direct_diff_max_abs
+- haar2d_axial_step_h4_w16_reverse_diff_mean
+- haar2d_axial_step_h4_w16_reverse_diff_std
+- haar2d_axial_step_h4_w16_reverse_diff_max
+- haar2d_axial_step_h4_w16_reverse_diff_min
+- haar2d_axial_step_h4_w16_reverse_diff_mean_abs
+- haar2d_axial_step_h4_w16_reverse_diff_max_abs
+- haar2d_axial_step_h4_w16_direct_corr
+- haar2d_axial_step_h4_w16_reverse_corr
+- haar2d_axial_step_h4_w16_reverse_gain
+- haar2d_lateral_step_h4_w16_left_mean
+- haar2d_lateral_step_h4_w16_left_std
+- haar2d_lateral_step_h4_w16_left_max
+- haar2d_lateral_step_h4_w16_left_min
+- haar2d_lateral_step_h4_w16_left_mean_abs
+- haar2d_lateral_step_h4_w16_left_max_abs
+- haar2d_lateral_step_h4_w16_right_mean
+- haar2d_lateral_step_h4_w16_right_std
+- haar2d_lateral_step_h4_w16_right_max
+- haar2d_lateral_step_h4_w16_right_min
+- haar2d_lateral_step_h4_w16_right_mean_abs
+- haar2d_lateral_step_h4_w16_right_max_abs
+- haar2d_lateral_step_h4_w16_direct_diff_mean
+- haar2d_lateral_step_h4_w16_direct_diff_std
+- haar2d_lateral_step_h4_w16_direct_diff_max
+- haar2d_lateral_step_h4_w16_direct_diff_min
+- haar2d_lateral_step_h4_w16_direct_diff_mean_abs
+- haar2d_lateral_step_h4_w16_direct_diff_max_abs
+- haar2d_lateral_step_h4_w16_reverse_diff_mean
+- haar2d_lateral_step_h4_w16_reverse_diff_std
+- haar2d_lateral_step_h4_w16_reverse_diff_max
+- haar2d_lateral_step_h4_w16_reverse_diff_min
+- haar2d_lateral_step_h4_w16_reverse_diff_mean_abs
+- haar2d_lateral_step_h4_w16_reverse_diff_max_abs
+- haar2d_lateral_step_h4_w16_direct_corr
+- haar2d_lateral_step_h4_w16_reverse_corr
+- haar2d_lateral_step_h4_w16_reverse_gain
+- haar2d_checker_h4_w16_left_mean
+- haar2d_checker_h4_w16_left_std
+- haar2d_checker_h4_w16_left_max
+- haar2d_checker_h4_w16_left_min
+- haar2d_checker_h4_w16_left_mean_abs
+- haar2d_checker_h4_w16_left_max_abs
+- haar2d_checker_h4_w16_right_mean
+- haar2d_checker_h4_w16_right_std
+- haar2d_checker_h4_w16_right_max
+- haar2d_checker_h4_w16_right_min
+- haar2d_checker_h4_w16_right_mean_abs
+- haar2d_checker_h4_w16_right_max_abs
+- haar2d_checker_h4_w16_direct_diff_mean
+- haar2d_checker_h4_w16_direct_diff_std
+- haar2d_checker_h4_w16_direct_diff_max
+- haar2d_checker_h4_w16_direct_diff_min
+- haar2d_checker_h4_w16_direct_diff_mean_abs
+- haar2d_checker_h4_w16_direct_diff_max_abs
+- haar2d_checker_h4_w16_reverse_diff_mean
+- haar2d_checker_h4_w16_reverse_diff_std
+- haar2d_checker_h4_w16_reverse_diff_max
+- haar2d_checker_h4_w16_reverse_diff_min
+- haar2d_checker_h4_w16_reverse_diff_mean_abs
+- haar2d_checker_h4_w16_reverse_diff_max_abs
+- haar2d_checker_h4_w16_direct_corr
+- haar2d_checker_h4_w16_reverse_corr
+- haar2d_checker_h4_w16_reverse_gain
+- haar2d_axial_center_surround_h4_w16_left_mean
+- haar2d_axial_center_surround_h4_w16_left_std
+- haar2d_axial_center_surround_h4_w16_left_max
+- haar2d_axial_center_surround_h4_w16_left_min
+- haar2d_axial_center_surround_h4_w16_left_mean_abs
+- haar2d_axial_center_surround_h4_w16_left_max_abs
+- haar2d_axial_center_surround_h4_w16_right_mean
+- haar2d_axial_center_surround_h4_w16_right_std
+- haar2d_axial_center_surround_h4_w16_right_max
+- haar2d_axial_center_surround_h4_w16_right_min
+- haar2d_axial_center_surround_h4_w16_right_mean_abs
+- haar2d_axial_center_surround_h4_w16_right_max_abs
+- haar2d_axial_center_surround_h4_w16_direct_diff_mean
+- haar2d_axial_center_surround_h4_w16_direct_diff_std
+- haar2d_axial_center_surround_h4_w16_direct_diff_max
+- haar2d_axial_center_surround_h4_w16_direct_diff_min
+- haar2d_axial_center_surround_h4_w16_direct_diff_mean_abs
+- haar2d_axial_center_surround_h4_w16_direct_diff_max_abs
+- haar2d_axial_center_surround_h4_w16_reverse_diff_mean
+- haar2d_axial_center_surround_h4_w16_reverse_diff_std
+- haar2d_axial_center_surround_h4_w16_reverse_diff_max
+- haar2d_axial_center_surround_h4_w16_reverse_diff_min
+- haar2d_axial_center_surround_h4_w16_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h4_w16_reverse_diff_max_abs
+- haar2d_axial_center_surround_h4_w16_direct_corr
+- haar2d_axial_center_surround_h4_w16_reverse_corr
+- haar2d_axial_center_surround_h4_w16_reverse_gain
+- haar2d_lateral_center_surround_h4_w16_left_mean
+- haar2d_lateral_center_surround_h4_w16_left_std
+- haar2d_lateral_center_surround_h4_w16_left_max
+- haar2d_lateral_center_surround_h4_w16_left_min
+- haar2d_lateral_center_surround_h4_w16_left_mean_abs
+- haar2d_lateral_center_surround_h4_w16_left_max_abs
+- haar2d_lateral_center_surround_h4_w16_right_mean
+- haar2d_lateral_center_surround_h4_w16_right_std
+- haar2d_lateral_center_surround_h4_w16_right_max
+- haar2d_lateral_center_surround_h4_w16_right_min
+- haar2d_lateral_center_surround_h4_w16_right_mean_abs
+- haar2d_lateral_center_surround_h4_w16_right_max_abs
+- haar2d_lateral_center_surround_h4_w16_direct_diff_mean
+- haar2d_lateral_center_surround_h4_w16_direct_diff_std
+- haar2d_lateral_center_surround_h4_w16_direct_diff_max
+- haar2d_lateral_center_surround_h4_w16_direct_diff_min
+- haar2d_lateral_center_surround_h4_w16_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w16_direct_diff_max_abs
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_mean
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_std
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_max
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_min
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w16_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h4_w16_direct_corr
+- haar2d_lateral_center_surround_h4_w16_reverse_corr
+- haar2d_lateral_center_surround_h4_w16_reverse_gain
+- haar2d_axial_step_h4_w32_left_mean
+- haar2d_axial_step_h4_w32_left_std
+- haar2d_axial_step_h4_w32_left_max
+- haar2d_axial_step_h4_w32_left_min
+- haar2d_axial_step_h4_w32_left_mean_abs
+- haar2d_axial_step_h4_w32_left_max_abs
+- haar2d_axial_step_h4_w32_right_mean
+- haar2d_axial_step_h4_w32_right_std
+- haar2d_axial_step_h4_w32_right_max
+- haar2d_axial_step_h4_w32_right_min
+- haar2d_axial_step_h4_w32_right_mean_abs
+- haar2d_axial_step_h4_w32_right_max_abs
+- haar2d_axial_step_h4_w32_direct_diff_mean
+- haar2d_axial_step_h4_w32_direct_diff_std
+- haar2d_axial_step_h4_w32_direct_diff_max
+- haar2d_axial_step_h4_w32_direct_diff_min
+- haar2d_axial_step_h4_w32_direct_diff_mean_abs
+- haar2d_axial_step_h4_w32_direct_diff_max_abs
+- haar2d_axial_step_h4_w32_reverse_diff_mean
+- haar2d_axial_step_h4_w32_reverse_diff_std
+- haar2d_axial_step_h4_w32_reverse_diff_max
+- haar2d_axial_step_h4_w32_reverse_diff_min
+- haar2d_axial_step_h4_w32_reverse_diff_mean_abs
+- haar2d_axial_step_h4_w32_reverse_diff_max_abs
+- haar2d_axial_step_h4_w32_direct_corr
+- haar2d_axial_step_h4_w32_reverse_corr
+- haar2d_axial_step_h4_w32_reverse_gain
+- haar2d_lateral_step_h4_w32_left_mean
+- haar2d_lateral_step_h4_w32_left_std
+- haar2d_lateral_step_h4_w32_left_max
+- haar2d_lateral_step_h4_w32_left_min
+- haar2d_lateral_step_h4_w32_left_mean_abs
+- haar2d_lateral_step_h4_w32_left_max_abs
+- haar2d_lateral_step_h4_w32_right_mean
+- haar2d_lateral_step_h4_w32_right_std
+- haar2d_lateral_step_h4_w32_right_max
+- haar2d_lateral_step_h4_w32_right_min
+- haar2d_lateral_step_h4_w32_right_mean_abs
+- haar2d_lateral_step_h4_w32_right_max_abs
+- haar2d_lateral_step_h4_w32_direct_diff_mean
+- haar2d_lateral_step_h4_w32_direct_diff_std
+- haar2d_lateral_step_h4_w32_direct_diff_max
+- haar2d_lateral_step_h4_w32_direct_diff_min
+- haar2d_lateral_step_h4_w32_direct_diff_mean_abs
+- haar2d_lateral_step_h4_w32_direct_diff_max_abs
+- haar2d_lateral_step_h4_w32_reverse_diff_mean
+- haar2d_lateral_step_h4_w32_reverse_diff_std
+- haar2d_lateral_step_h4_w32_reverse_diff_max
+- haar2d_lateral_step_h4_w32_reverse_diff_min
+- haar2d_lateral_step_h4_w32_reverse_diff_mean_abs
+- haar2d_lateral_step_h4_w32_reverse_diff_max_abs
+- haar2d_lateral_step_h4_w32_direct_corr
+- haar2d_lateral_step_h4_w32_reverse_corr
+- haar2d_lateral_step_h4_w32_reverse_gain
+- haar2d_checker_h4_w32_left_mean
+- haar2d_checker_h4_w32_left_std
+- haar2d_checker_h4_w32_left_max
+- haar2d_checker_h4_w32_left_min
+- haar2d_checker_h4_w32_left_mean_abs
+- haar2d_checker_h4_w32_left_max_abs
+- haar2d_checker_h4_w32_right_mean
+- haar2d_checker_h4_w32_right_std
+- haar2d_checker_h4_w32_right_max
+- haar2d_checker_h4_w32_right_min
+- haar2d_checker_h4_w32_right_mean_abs
+- haar2d_checker_h4_w32_right_max_abs
+- haar2d_checker_h4_w32_direct_diff_mean
+- haar2d_checker_h4_w32_direct_diff_std
+- haar2d_checker_h4_w32_direct_diff_max
+- haar2d_checker_h4_w32_direct_diff_min
+- haar2d_checker_h4_w32_direct_diff_mean_abs
+- haar2d_checker_h4_w32_direct_diff_max_abs
+- haar2d_checker_h4_w32_reverse_diff_mean
+- haar2d_checker_h4_w32_reverse_diff_std
+- haar2d_checker_h4_w32_reverse_diff_max
+- haar2d_checker_h4_w32_reverse_diff_min
+- haar2d_checker_h4_w32_reverse_diff_mean_abs
+- haar2d_checker_h4_w32_reverse_diff_max_abs
+- haar2d_checker_h4_w32_direct_corr
+- haar2d_checker_h4_w32_reverse_corr
+- haar2d_checker_h4_w32_reverse_gain
+- haar2d_axial_center_surround_h4_w32_left_mean
+- haar2d_axial_center_surround_h4_w32_left_std
+- haar2d_axial_center_surround_h4_w32_left_max
+- haar2d_axial_center_surround_h4_w32_left_min
+- haar2d_axial_center_surround_h4_w32_left_mean_abs
+- haar2d_axial_center_surround_h4_w32_left_max_abs
+- haar2d_axial_center_surround_h4_w32_right_mean
+- haar2d_axial_center_surround_h4_w32_right_std
+- haar2d_axial_center_surround_h4_w32_right_max
+- haar2d_axial_center_surround_h4_w32_right_min
+- haar2d_axial_center_surround_h4_w32_right_mean_abs
+- haar2d_axial_center_surround_h4_w32_right_max_abs
+- haar2d_axial_center_surround_h4_w32_direct_diff_mean
+- haar2d_axial_center_surround_h4_w32_direct_diff_std
+- haar2d_axial_center_surround_h4_w32_direct_diff_max
+- haar2d_axial_center_surround_h4_w32_direct_diff_min
+- haar2d_axial_center_surround_h4_w32_direct_diff_mean_abs
+- haar2d_axial_center_surround_h4_w32_direct_diff_max_abs
+- haar2d_axial_center_surround_h4_w32_reverse_diff_mean
+- haar2d_axial_center_surround_h4_w32_reverse_diff_std
+- haar2d_axial_center_surround_h4_w32_reverse_diff_max
+- haar2d_axial_center_surround_h4_w32_reverse_diff_min
+- haar2d_axial_center_surround_h4_w32_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h4_w32_reverse_diff_max_abs
+- haar2d_axial_center_surround_h4_w32_direct_corr
+- haar2d_axial_center_surround_h4_w32_reverse_corr
+- haar2d_axial_center_surround_h4_w32_reverse_gain
+- haar2d_lateral_center_surround_h4_w32_left_mean
+- haar2d_lateral_center_surround_h4_w32_left_std
+- haar2d_lateral_center_surround_h4_w32_left_max
+- haar2d_lateral_center_surround_h4_w32_left_min
+- haar2d_lateral_center_surround_h4_w32_left_mean_abs
+- haar2d_lateral_center_surround_h4_w32_left_max_abs
+- haar2d_lateral_center_surround_h4_w32_right_mean
+- haar2d_lateral_center_surround_h4_w32_right_std
+- haar2d_lateral_center_surround_h4_w32_right_max
+- haar2d_lateral_center_surround_h4_w32_right_min
+- haar2d_lateral_center_surround_h4_w32_right_mean_abs
+- haar2d_lateral_center_surround_h4_w32_right_max_abs
+- haar2d_lateral_center_surround_h4_w32_direct_diff_mean
+- haar2d_lateral_center_surround_h4_w32_direct_diff_std
+- haar2d_lateral_center_surround_h4_w32_direct_diff_max
+- haar2d_lateral_center_surround_h4_w32_direct_diff_min
+- haar2d_lateral_center_surround_h4_w32_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w32_direct_diff_max_abs
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_mean
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_std
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_max
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_min
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h4_w32_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h4_w32_direct_corr
+- haar2d_lateral_center_surround_h4_w32_reverse_corr
+- haar2d_lateral_center_surround_h4_w32_reverse_gain
+- haar2d_axial_step_h8_w8_left_mean
+- haar2d_axial_step_h8_w8_left_std
+- haar2d_axial_step_h8_w8_left_max
+- haar2d_axial_step_h8_w8_left_min
+- haar2d_axial_step_h8_w8_left_mean_abs
+- haar2d_axial_step_h8_w8_left_max_abs
+- haar2d_axial_step_h8_w8_right_mean
+- haar2d_axial_step_h8_w8_right_std
+- haar2d_axial_step_h8_w8_right_max
+- haar2d_axial_step_h8_w8_right_min
+- haar2d_axial_step_h8_w8_right_mean_abs
+- haar2d_axial_step_h8_w8_right_max_abs
+- haar2d_axial_step_h8_w8_direct_diff_mean
+- haar2d_axial_step_h8_w8_direct_diff_std
+- haar2d_axial_step_h8_w8_direct_diff_max
+- haar2d_axial_step_h8_w8_direct_diff_min
+- haar2d_axial_step_h8_w8_direct_diff_mean_abs
+- haar2d_axial_step_h8_w8_direct_diff_max_abs
+- haar2d_axial_step_h8_w8_reverse_diff_mean
+- haar2d_axial_step_h8_w8_reverse_diff_std
+- haar2d_axial_step_h8_w8_reverse_diff_max
+- haar2d_axial_step_h8_w8_reverse_diff_min
+- haar2d_axial_step_h8_w8_reverse_diff_mean_abs
+- haar2d_axial_step_h8_w8_reverse_diff_max_abs
+- haar2d_axial_step_h8_w8_direct_corr
+- haar2d_axial_step_h8_w8_reverse_corr
+- haar2d_axial_step_h8_w8_reverse_gain
+- haar2d_lateral_step_h8_w8_left_mean
+- haar2d_lateral_step_h8_w8_left_std
+- haar2d_lateral_step_h8_w8_left_max
+- haar2d_lateral_step_h8_w8_left_min
+- haar2d_lateral_step_h8_w8_left_mean_abs
+- haar2d_lateral_step_h8_w8_left_max_abs
+- haar2d_lateral_step_h8_w8_right_mean
+- haar2d_lateral_step_h8_w8_right_std
+- haar2d_lateral_step_h8_w8_right_max
+- haar2d_lateral_step_h8_w8_right_min
+- haar2d_lateral_step_h8_w8_right_mean_abs
+- haar2d_lateral_step_h8_w8_right_max_abs
+- haar2d_lateral_step_h8_w8_direct_diff_mean
+- haar2d_lateral_step_h8_w8_direct_diff_std
+- haar2d_lateral_step_h8_w8_direct_diff_max
+- haar2d_lateral_step_h8_w8_direct_diff_min
+- haar2d_lateral_step_h8_w8_direct_diff_mean_abs
+- haar2d_lateral_step_h8_w8_direct_diff_max_abs
+- haar2d_lateral_step_h8_w8_reverse_diff_mean
+- haar2d_lateral_step_h8_w8_reverse_diff_std
+- haar2d_lateral_step_h8_w8_reverse_diff_max
+- haar2d_lateral_step_h8_w8_reverse_diff_min
+- haar2d_lateral_step_h8_w8_reverse_diff_mean_abs
+- haar2d_lateral_step_h8_w8_reverse_diff_max_abs
+- haar2d_lateral_step_h8_w8_direct_corr
+- haar2d_lateral_step_h8_w8_reverse_corr
+- haar2d_lateral_step_h8_w8_reverse_gain
+- haar2d_checker_h8_w8_left_mean
+- haar2d_checker_h8_w8_left_std
+- haar2d_checker_h8_w8_left_max
+- haar2d_checker_h8_w8_left_min
+- haar2d_checker_h8_w8_left_mean_abs
+- haar2d_checker_h8_w8_left_max_abs
+- haar2d_checker_h8_w8_right_mean
+- haar2d_checker_h8_w8_right_std
+- haar2d_checker_h8_w8_right_max
+- haar2d_checker_h8_w8_right_min
+- haar2d_checker_h8_w8_right_mean_abs
+- haar2d_checker_h8_w8_right_max_abs
+- haar2d_checker_h8_w8_direct_diff_mean
+- haar2d_checker_h8_w8_direct_diff_std
+- haar2d_checker_h8_w8_direct_diff_max
+- haar2d_checker_h8_w8_direct_diff_min
+- haar2d_checker_h8_w8_direct_diff_mean_abs
+- haar2d_checker_h8_w8_direct_diff_max_abs
+- haar2d_checker_h8_w8_reverse_diff_mean
+- haar2d_checker_h8_w8_reverse_diff_std
+- haar2d_checker_h8_w8_reverse_diff_max
+- haar2d_checker_h8_w8_reverse_diff_min
+- haar2d_checker_h8_w8_reverse_diff_mean_abs
+- haar2d_checker_h8_w8_reverse_diff_max_abs
+- haar2d_checker_h8_w8_direct_corr
+- haar2d_checker_h8_w8_reverse_corr
+- haar2d_checker_h8_w8_reverse_gain
+- haar2d_axial_center_surround_h8_w8_left_mean
+- haar2d_axial_center_surround_h8_w8_left_std
+- haar2d_axial_center_surround_h8_w8_left_max
+- haar2d_axial_center_surround_h8_w8_left_min
+- haar2d_axial_center_surround_h8_w8_left_mean_abs
+- haar2d_axial_center_surround_h8_w8_left_max_abs
+- haar2d_axial_center_surround_h8_w8_right_mean
+- haar2d_axial_center_surround_h8_w8_right_std
+- haar2d_axial_center_surround_h8_w8_right_max
+- haar2d_axial_center_surround_h8_w8_right_min
+- haar2d_axial_center_surround_h8_w8_right_mean_abs
+- haar2d_axial_center_surround_h8_w8_right_max_abs
+- haar2d_axial_center_surround_h8_w8_direct_diff_mean
+- haar2d_axial_center_surround_h8_w8_direct_diff_std
+- haar2d_axial_center_surround_h8_w8_direct_diff_max
+- haar2d_axial_center_surround_h8_w8_direct_diff_min
+- haar2d_axial_center_surround_h8_w8_direct_diff_mean_abs
+- haar2d_axial_center_surround_h8_w8_direct_diff_max_abs
+- haar2d_axial_center_surround_h8_w8_reverse_diff_mean
+- haar2d_axial_center_surround_h8_w8_reverse_diff_std
+- haar2d_axial_center_surround_h8_w8_reverse_diff_max
+- haar2d_axial_center_surround_h8_w8_reverse_diff_min
+- haar2d_axial_center_surround_h8_w8_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h8_w8_reverse_diff_max_abs
+- haar2d_axial_center_surround_h8_w8_direct_corr
+- haar2d_axial_center_surround_h8_w8_reverse_corr
+- haar2d_axial_center_surround_h8_w8_reverse_gain
+- haar2d_lateral_center_surround_h8_w8_left_mean
+- haar2d_lateral_center_surround_h8_w8_left_std
+- haar2d_lateral_center_surround_h8_w8_left_max
+- haar2d_lateral_center_surround_h8_w8_left_min
+- haar2d_lateral_center_surround_h8_w8_left_mean_abs
+- haar2d_lateral_center_surround_h8_w8_left_max_abs
+- haar2d_lateral_center_surround_h8_w8_right_mean
+- haar2d_lateral_center_surround_h8_w8_right_std
+- haar2d_lateral_center_surround_h8_w8_right_max
+- haar2d_lateral_center_surround_h8_w8_right_min
+- haar2d_lateral_center_surround_h8_w8_right_mean_abs
+- haar2d_lateral_center_surround_h8_w8_right_max_abs
+- haar2d_lateral_center_surround_h8_w8_direct_diff_mean
+- haar2d_lateral_center_surround_h8_w8_direct_diff_std
+- haar2d_lateral_center_surround_h8_w8_direct_diff_max
+- haar2d_lateral_center_surround_h8_w8_direct_diff_min
+- haar2d_lateral_center_surround_h8_w8_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w8_direct_diff_max_abs
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_mean
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_std
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_max
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_min
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w8_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h8_w8_direct_corr
+- haar2d_lateral_center_surround_h8_w8_reverse_corr
+- haar2d_lateral_center_surround_h8_w8_reverse_gain
+- haar2d_axial_step_h8_w16_left_mean
+- haar2d_axial_step_h8_w16_left_std
+- haar2d_axial_step_h8_w16_left_max
+- haar2d_axial_step_h8_w16_left_min
+- haar2d_axial_step_h8_w16_left_mean_abs
+- haar2d_axial_step_h8_w16_left_max_abs
+- haar2d_axial_step_h8_w16_right_mean
+- haar2d_axial_step_h8_w16_right_std
+- haar2d_axial_step_h8_w16_right_max
+- haar2d_axial_step_h8_w16_right_min
+- haar2d_axial_step_h8_w16_right_mean_abs
+- haar2d_axial_step_h8_w16_right_max_abs
+- haar2d_axial_step_h8_w16_direct_diff_mean
+- haar2d_axial_step_h8_w16_direct_diff_std
+- haar2d_axial_step_h8_w16_direct_diff_max
+- haar2d_axial_step_h8_w16_direct_diff_min
+- haar2d_axial_step_h8_w16_direct_diff_mean_abs
+- haar2d_axial_step_h8_w16_direct_diff_max_abs
+- haar2d_axial_step_h8_w16_reverse_diff_mean
+- haar2d_axial_step_h8_w16_reverse_diff_std
+- haar2d_axial_step_h8_w16_reverse_diff_max
+- haar2d_axial_step_h8_w16_reverse_diff_min
+- haar2d_axial_step_h8_w16_reverse_diff_mean_abs
+- haar2d_axial_step_h8_w16_reverse_diff_max_abs
+- haar2d_axial_step_h8_w16_direct_corr
+- haar2d_axial_step_h8_w16_reverse_corr
+- haar2d_axial_step_h8_w16_reverse_gain
+- haar2d_lateral_step_h8_w16_left_mean
+- haar2d_lateral_step_h8_w16_left_std
+- haar2d_lateral_step_h8_w16_left_max
+- haar2d_lateral_step_h8_w16_left_min
+- haar2d_lateral_step_h8_w16_left_mean_abs
+- haar2d_lateral_step_h8_w16_left_max_abs
+- haar2d_lateral_step_h8_w16_right_mean
+- haar2d_lateral_step_h8_w16_right_std
+- haar2d_lateral_step_h8_w16_right_max
+- haar2d_lateral_step_h8_w16_right_min
+- haar2d_lateral_step_h8_w16_right_mean_abs
+- haar2d_lateral_step_h8_w16_right_max_abs
+- haar2d_lateral_step_h8_w16_direct_diff_mean
+- haar2d_lateral_step_h8_w16_direct_diff_std
+- haar2d_lateral_step_h8_w16_direct_diff_max
+- haar2d_lateral_step_h8_w16_direct_diff_min
+- haar2d_lateral_step_h8_w16_direct_diff_mean_abs
+- haar2d_lateral_step_h8_w16_direct_diff_max_abs
+- haar2d_lateral_step_h8_w16_reverse_diff_mean
+- haar2d_lateral_step_h8_w16_reverse_diff_std
+- haar2d_lateral_step_h8_w16_reverse_diff_max
+- haar2d_lateral_step_h8_w16_reverse_diff_min
+- haar2d_lateral_step_h8_w16_reverse_diff_mean_abs
+- haar2d_lateral_step_h8_w16_reverse_diff_max_abs
+- haar2d_lateral_step_h8_w16_direct_corr
+- haar2d_lateral_step_h8_w16_reverse_corr
+- haar2d_lateral_step_h8_w16_reverse_gain
+- haar2d_checker_h8_w16_left_mean
+- haar2d_checker_h8_w16_left_std
+- haar2d_checker_h8_w16_left_max
+- haar2d_checker_h8_w16_left_min
+- haar2d_checker_h8_w16_left_mean_abs
+- haar2d_checker_h8_w16_left_max_abs
+- haar2d_checker_h8_w16_right_mean
+- haar2d_checker_h8_w16_right_std
+- haar2d_checker_h8_w16_right_max
+- haar2d_checker_h8_w16_right_min
+- haar2d_checker_h8_w16_right_mean_abs
+- haar2d_checker_h8_w16_right_max_abs
+- haar2d_checker_h8_w16_direct_diff_mean
+- haar2d_checker_h8_w16_direct_diff_std
+- haar2d_checker_h8_w16_direct_diff_max
+- haar2d_checker_h8_w16_direct_diff_min
+- haar2d_checker_h8_w16_direct_diff_mean_abs
+- haar2d_checker_h8_w16_direct_diff_max_abs
+- haar2d_checker_h8_w16_reverse_diff_mean
+- haar2d_checker_h8_w16_reverse_diff_std
+- haar2d_checker_h8_w16_reverse_diff_max
+- haar2d_checker_h8_w16_reverse_diff_min
+- haar2d_checker_h8_w16_reverse_diff_mean_abs
+- haar2d_checker_h8_w16_reverse_diff_max_abs
+- haar2d_checker_h8_w16_direct_corr
+- haar2d_checker_h8_w16_reverse_corr
+- haar2d_checker_h8_w16_reverse_gain
+- haar2d_axial_center_surround_h8_w16_left_mean
+- haar2d_axial_center_surround_h8_w16_left_std
+- haar2d_axial_center_surround_h8_w16_left_max
+- haar2d_axial_center_surround_h8_w16_left_min
+- haar2d_axial_center_surround_h8_w16_left_mean_abs
+- haar2d_axial_center_surround_h8_w16_left_max_abs
+- haar2d_axial_center_surround_h8_w16_right_mean
+- haar2d_axial_center_surround_h8_w16_right_std
+- haar2d_axial_center_surround_h8_w16_right_max
+- haar2d_axial_center_surround_h8_w16_right_min
+- haar2d_axial_center_surround_h8_w16_right_mean_abs
+- haar2d_axial_center_surround_h8_w16_right_max_abs
+- haar2d_axial_center_surround_h8_w16_direct_diff_mean
+- haar2d_axial_center_surround_h8_w16_direct_diff_std
+- haar2d_axial_center_surround_h8_w16_direct_diff_max
+- haar2d_axial_center_surround_h8_w16_direct_diff_min
+- haar2d_axial_center_surround_h8_w16_direct_diff_mean_abs
+- haar2d_axial_center_surround_h8_w16_direct_diff_max_abs
+- haar2d_axial_center_surround_h8_w16_reverse_diff_mean
+- haar2d_axial_center_surround_h8_w16_reverse_diff_std
+- haar2d_axial_center_surround_h8_w16_reverse_diff_max
+- haar2d_axial_center_surround_h8_w16_reverse_diff_min
+- haar2d_axial_center_surround_h8_w16_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h8_w16_reverse_diff_max_abs
+- haar2d_axial_center_surround_h8_w16_direct_corr
+- haar2d_axial_center_surround_h8_w16_reverse_corr
+- haar2d_axial_center_surround_h8_w16_reverse_gain
+- haar2d_lateral_center_surround_h8_w16_left_mean
+- haar2d_lateral_center_surround_h8_w16_left_std
+- haar2d_lateral_center_surround_h8_w16_left_max
+- haar2d_lateral_center_surround_h8_w16_left_min
+- haar2d_lateral_center_surround_h8_w16_left_mean_abs
+- haar2d_lateral_center_surround_h8_w16_left_max_abs
+- haar2d_lateral_center_surround_h8_w16_right_mean
+- haar2d_lateral_center_surround_h8_w16_right_std
+- haar2d_lateral_center_surround_h8_w16_right_max
+- haar2d_lateral_center_surround_h8_w16_right_min
+- haar2d_lateral_center_surround_h8_w16_right_mean_abs
+- haar2d_lateral_center_surround_h8_w16_right_max_abs
+- haar2d_lateral_center_surround_h8_w16_direct_diff_mean
+- haar2d_lateral_center_surround_h8_w16_direct_diff_std
+- haar2d_lateral_center_surround_h8_w16_direct_diff_max
+- haar2d_lateral_center_surround_h8_w16_direct_diff_min
+- haar2d_lateral_center_surround_h8_w16_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w16_direct_diff_max_abs
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_mean
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_std
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_max
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_min
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w16_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h8_w16_direct_corr
+- haar2d_lateral_center_surround_h8_w16_reverse_corr
+- haar2d_lateral_center_surround_h8_w16_reverse_gain
+- haar2d_axial_step_h8_w32_left_mean
+- haar2d_axial_step_h8_w32_left_std
+- haar2d_axial_step_h8_w32_left_max
+- haar2d_axial_step_h8_w32_left_min
+- haar2d_axial_step_h8_w32_left_mean_abs
+- haar2d_axial_step_h8_w32_left_max_abs
+- haar2d_axial_step_h8_w32_right_mean
+- haar2d_axial_step_h8_w32_right_std
+- haar2d_axial_step_h8_w32_right_max
+- haar2d_axial_step_h8_w32_right_min
+- haar2d_axial_step_h8_w32_right_mean_abs
+- haar2d_axial_step_h8_w32_right_max_abs
+- haar2d_axial_step_h8_w32_direct_diff_mean
+- haar2d_axial_step_h8_w32_direct_diff_std
+- haar2d_axial_step_h8_w32_direct_diff_max
+- haar2d_axial_step_h8_w32_direct_diff_min
+- haar2d_axial_step_h8_w32_direct_diff_mean_abs
+- haar2d_axial_step_h8_w32_direct_diff_max_abs
+- haar2d_axial_step_h8_w32_reverse_diff_mean
+- haar2d_axial_step_h8_w32_reverse_diff_std
+- haar2d_axial_step_h8_w32_reverse_diff_max
+- haar2d_axial_step_h8_w32_reverse_diff_min
+- haar2d_axial_step_h8_w32_reverse_diff_mean_abs
+- haar2d_axial_step_h8_w32_reverse_diff_max_abs
+- haar2d_axial_step_h8_w32_direct_corr
+- haar2d_axial_step_h8_w32_reverse_corr
+- haar2d_axial_step_h8_w32_reverse_gain
+- haar2d_lateral_step_h8_w32_left_mean
+- haar2d_lateral_step_h8_w32_left_std
+- haar2d_lateral_step_h8_w32_left_max
+- haar2d_lateral_step_h8_w32_left_min
+- haar2d_lateral_step_h8_w32_left_mean_abs
+- haar2d_lateral_step_h8_w32_left_max_abs
+- haar2d_lateral_step_h8_w32_right_mean
+- haar2d_lateral_step_h8_w32_right_std
+- haar2d_lateral_step_h8_w32_right_max
+- haar2d_lateral_step_h8_w32_right_min
+- haar2d_lateral_step_h8_w32_right_mean_abs
+- haar2d_lateral_step_h8_w32_right_max_abs
+- haar2d_lateral_step_h8_w32_direct_diff_mean
+- haar2d_lateral_step_h8_w32_direct_diff_std
+- haar2d_lateral_step_h8_w32_direct_diff_max
+- haar2d_lateral_step_h8_w32_direct_diff_min
+- haar2d_lateral_step_h8_w32_direct_diff_mean_abs
+- haar2d_lateral_step_h8_w32_direct_diff_max_abs
+- haar2d_lateral_step_h8_w32_reverse_diff_mean
+- haar2d_lateral_step_h8_w32_reverse_diff_std
+- haar2d_lateral_step_h8_w32_reverse_diff_max
+- haar2d_lateral_step_h8_w32_reverse_diff_min
+- haar2d_lateral_step_h8_w32_reverse_diff_mean_abs
+- haar2d_lateral_step_h8_w32_reverse_diff_max_abs
+- haar2d_lateral_step_h8_w32_direct_corr
+- haar2d_lateral_step_h8_w32_reverse_corr
+- haar2d_lateral_step_h8_w32_reverse_gain
+- haar2d_checker_h8_w32_left_mean
+- haar2d_checker_h8_w32_left_std
+- haar2d_checker_h8_w32_left_max
+- haar2d_checker_h8_w32_left_min
+- haar2d_checker_h8_w32_left_mean_abs
+- haar2d_checker_h8_w32_left_max_abs
+- haar2d_checker_h8_w32_right_mean
+- haar2d_checker_h8_w32_right_std
+- haar2d_checker_h8_w32_right_max
+- haar2d_checker_h8_w32_right_min
+- haar2d_checker_h8_w32_right_mean_abs
+- haar2d_checker_h8_w32_right_max_abs
+- haar2d_checker_h8_w32_direct_diff_mean
+- haar2d_checker_h8_w32_direct_diff_std
+- haar2d_checker_h8_w32_direct_diff_max
+- haar2d_checker_h8_w32_direct_diff_min
+- haar2d_checker_h8_w32_direct_diff_mean_abs
+- haar2d_checker_h8_w32_direct_diff_max_abs
+- haar2d_checker_h8_w32_reverse_diff_mean
+- haar2d_checker_h8_w32_reverse_diff_std
+- haar2d_checker_h8_w32_reverse_diff_max
+- haar2d_checker_h8_w32_reverse_diff_min
+- haar2d_checker_h8_w32_reverse_diff_mean_abs
+- haar2d_checker_h8_w32_reverse_diff_max_abs
+- haar2d_checker_h8_w32_direct_corr
+- haar2d_checker_h8_w32_reverse_corr
+- haar2d_checker_h8_w32_reverse_gain
+- haar2d_axial_center_surround_h8_w32_left_mean
+- haar2d_axial_center_surround_h8_w32_left_std
+- haar2d_axial_center_surround_h8_w32_left_max
+- haar2d_axial_center_surround_h8_w32_left_min
+- haar2d_axial_center_surround_h8_w32_left_mean_abs
+- haar2d_axial_center_surround_h8_w32_left_max_abs
+- haar2d_axial_center_surround_h8_w32_right_mean
+- haar2d_axial_center_surround_h8_w32_right_std
+- haar2d_axial_center_surround_h8_w32_right_max
+- haar2d_axial_center_surround_h8_w32_right_min
+- haar2d_axial_center_surround_h8_w32_right_mean_abs
+- haar2d_axial_center_surround_h8_w32_right_max_abs
+- haar2d_axial_center_surround_h8_w32_direct_diff_mean
+- haar2d_axial_center_surround_h8_w32_direct_diff_std
+- haar2d_axial_center_surround_h8_w32_direct_diff_max
+- haar2d_axial_center_surround_h8_w32_direct_diff_min
+- haar2d_axial_center_surround_h8_w32_direct_diff_mean_abs
+- haar2d_axial_center_surround_h8_w32_direct_diff_max_abs
+- haar2d_axial_center_surround_h8_w32_reverse_diff_mean
+- haar2d_axial_center_surround_h8_w32_reverse_diff_std
+- haar2d_axial_center_surround_h8_w32_reverse_diff_max
+- haar2d_axial_center_surround_h8_w32_reverse_diff_min
+- haar2d_axial_center_surround_h8_w32_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h8_w32_reverse_diff_max_abs
+- haar2d_axial_center_surround_h8_w32_direct_corr
+- haar2d_axial_center_surround_h8_w32_reverse_corr
+- haar2d_axial_center_surround_h8_w32_reverse_gain
+- haar2d_lateral_center_surround_h8_w32_left_mean
+- haar2d_lateral_center_surround_h8_w32_left_std
+- haar2d_lateral_center_surround_h8_w32_left_max
+- haar2d_lateral_center_surround_h8_w32_left_min
+- haar2d_lateral_center_surround_h8_w32_left_mean_abs
+- haar2d_lateral_center_surround_h8_w32_left_max_abs
+- haar2d_lateral_center_surround_h8_w32_right_mean
+- haar2d_lateral_center_surround_h8_w32_right_std
+- haar2d_lateral_center_surround_h8_w32_right_max
+- haar2d_lateral_center_surround_h8_w32_right_min
+- haar2d_lateral_center_surround_h8_w32_right_mean_abs
+- haar2d_lateral_center_surround_h8_w32_right_max_abs
+- haar2d_lateral_center_surround_h8_w32_direct_diff_mean
+- haar2d_lateral_center_surround_h8_w32_direct_diff_std
+- haar2d_lateral_center_surround_h8_w32_direct_diff_max
+- haar2d_lateral_center_surround_h8_w32_direct_diff_min
+- haar2d_lateral_center_surround_h8_w32_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w32_direct_diff_max_abs
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_mean
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_std
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_max
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_min
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h8_w32_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h8_w32_direct_corr
+- haar2d_lateral_center_surround_h8_w32_reverse_corr
+- haar2d_lateral_center_surround_h8_w32_reverse_gain
+- haar2d_axial_step_h16_w8_left_mean
+- haar2d_axial_step_h16_w8_left_std
+- haar2d_axial_step_h16_w8_left_max
+- haar2d_axial_step_h16_w8_left_min
+- haar2d_axial_step_h16_w8_left_mean_abs
+- haar2d_axial_step_h16_w8_left_max_abs
+- haar2d_axial_step_h16_w8_right_mean
+- haar2d_axial_step_h16_w8_right_std
+- haar2d_axial_step_h16_w8_right_max
+- haar2d_axial_step_h16_w8_right_min
+- haar2d_axial_step_h16_w8_right_mean_abs
+- haar2d_axial_step_h16_w8_right_max_abs
+- haar2d_axial_step_h16_w8_direct_diff_mean
+- haar2d_axial_step_h16_w8_direct_diff_std
+- haar2d_axial_step_h16_w8_direct_diff_max
+- haar2d_axial_step_h16_w8_direct_diff_min
+- haar2d_axial_step_h16_w8_direct_diff_mean_abs
+- haar2d_axial_step_h16_w8_direct_diff_max_abs
+- haar2d_axial_step_h16_w8_reverse_diff_mean
+- haar2d_axial_step_h16_w8_reverse_diff_std
+- haar2d_axial_step_h16_w8_reverse_diff_max
+- haar2d_axial_step_h16_w8_reverse_diff_min
+- haar2d_axial_step_h16_w8_reverse_diff_mean_abs
+- haar2d_axial_step_h16_w8_reverse_diff_max_abs
+- haar2d_axial_step_h16_w8_direct_corr
+- haar2d_axial_step_h16_w8_reverse_corr
+- haar2d_axial_step_h16_w8_reverse_gain
+- haar2d_lateral_step_h16_w8_left_mean
+- haar2d_lateral_step_h16_w8_left_std
+- haar2d_lateral_step_h16_w8_left_max
+- haar2d_lateral_step_h16_w8_left_min
+- haar2d_lateral_step_h16_w8_left_mean_abs
+- haar2d_lateral_step_h16_w8_left_max_abs
+- haar2d_lateral_step_h16_w8_right_mean
+- haar2d_lateral_step_h16_w8_right_std
+- haar2d_lateral_step_h16_w8_right_max
+- haar2d_lateral_step_h16_w8_right_min
+- haar2d_lateral_step_h16_w8_right_mean_abs
+- haar2d_lateral_step_h16_w8_right_max_abs
+- haar2d_lateral_step_h16_w8_direct_diff_mean
+- haar2d_lateral_step_h16_w8_direct_diff_std
+- haar2d_lateral_step_h16_w8_direct_diff_max
+- haar2d_lateral_step_h16_w8_direct_diff_min
+- haar2d_lateral_step_h16_w8_direct_diff_mean_abs
+- haar2d_lateral_step_h16_w8_direct_diff_max_abs
+- haar2d_lateral_step_h16_w8_reverse_diff_mean
+- haar2d_lateral_step_h16_w8_reverse_diff_std
+- haar2d_lateral_step_h16_w8_reverse_diff_max
+- haar2d_lateral_step_h16_w8_reverse_diff_min
+- haar2d_lateral_step_h16_w8_reverse_diff_mean_abs
+- haar2d_lateral_step_h16_w8_reverse_diff_max_abs
+- haar2d_lateral_step_h16_w8_direct_corr
+- haar2d_lateral_step_h16_w8_reverse_corr
+- haar2d_lateral_step_h16_w8_reverse_gain
+- haar2d_checker_h16_w8_left_mean
+- haar2d_checker_h16_w8_left_std
+- haar2d_checker_h16_w8_left_max
+- haar2d_checker_h16_w8_left_min
+- haar2d_checker_h16_w8_left_mean_abs
+- haar2d_checker_h16_w8_left_max_abs
+- haar2d_checker_h16_w8_right_mean
+- haar2d_checker_h16_w8_right_std
+- haar2d_checker_h16_w8_right_max
+- haar2d_checker_h16_w8_right_min
+- haar2d_checker_h16_w8_right_mean_abs
+- haar2d_checker_h16_w8_right_max_abs
+- haar2d_checker_h16_w8_direct_diff_mean
+- haar2d_checker_h16_w8_direct_diff_std
+- haar2d_checker_h16_w8_direct_diff_max
+- haar2d_checker_h16_w8_direct_diff_min
+- haar2d_checker_h16_w8_direct_diff_mean_abs
+- haar2d_checker_h16_w8_direct_diff_max_abs
+- haar2d_checker_h16_w8_reverse_diff_mean
+- haar2d_checker_h16_w8_reverse_diff_std
+- haar2d_checker_h16_w8_reverse_diff_max
+- haar2d_checker_h16_w8_reverse_diff_min
+- haar2d_checker_h16_w8_reverse_diff_mean_abs
+- haar2d_checker_h16_w8_reverse_diff_max_abs
+- haar2d_checker_h16_w8_direct_corr
+- haar2d_checker_h16_w8_reverse_corr
+- haar2d_checker_h16_w8_reverse_gain
+- haar2d_axial_center_surround_h16_w8_left_mean
+- haar2d_axial_center_surround_h16_w8_left_std
+- haar2d_axial_center_surround_h16_w8_left_max
+- haar2d_axial_center_surround_h16_w8_left_min
+- haar2d_axial_center_surround_h16_w8_left_mean_abs
+- haar2d_axial_center_surround_h16_w8_left_max_abs
+- haar2d_axial_center_surround_h16_w8_right_mean
+- haar2d_axial_center_surround_h16_w8_right_std
+- haar2d_axial_center_surround_h16_w8_right_max
+- haar2d_axial_center_surround_h16_w8_right_min
+- haar2d_axial_center_surround_h16_w8_right_mean_abs
+- haar2d_axial_center_surround_h16_w8_right_max_abs
+- haar2d_axial_center_surround_h16_w8_direct_diff_mean
+- haar2d_axial_center_surround_h16_w8_direct_diff_std
+- haar2d_axial_center_surround_h16_w8_direct_diff_max
+- haar2d_axial_center_surround_h16_w8_direct_diff_min
+- haar2d_axial_center_surround_h16_w8_direct_diff_mean_abs
+- haar2d_axial_center_surround_h16_w8_direct_diff_max_abs
+- haar2d_axial_center_surround_h16_w8_reverse_diff_mean
+- haar2d_axial_center_surround_h16_w8_reverse_diff_std
+- haar2d_axial_center_surround_h16_w8_reverse_diff_max
+- haar2d_axial_center_surround_h16_w8_reverse_diff_min
+- haar2d_axial_center_surround_h16_w8_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h16_w8_reverse_diff_max_abs
+- haar2d_axial_center_surround_h16_w8_direct_corr
+- haar2d_axial_center_surround_h16_w8_reverse_corr
+- haar2d_axial_center_surround_h16_w8_reverse_gain
+- haar2d_lateral_center_surround_h16_w8_left_mean
+- haar2d_lateral_center_surround_h16_w8_left_std
+- haar2d_lateral_center_surround_h16_w8_left_max
+- haar2d_lateral_center_surround_h16_w8_left_min
+- haar2d_lateral_center_surround_h16_w8_left_mean_abs
+- haar2d_lateral_center_surround_h16_w8_left_max_abs
+- haar2d_lateral_center_surround_h16_w8_right_mean
+- haar2d_lateral_center_surround_h16_w8_right_std
+- haar2d_lateral_center_surround_h16_w8_right_max
+- haar2d_lateral_center_surround_h16_w8_right_min
+- haar2d_lateral_center_surround_h16_w8_right_mean_abs
+- haar2d_lateral_center_surround_h16_w8_right_max_abs
+- haar2d_lateral_center_surround_h16_w8_direct_diff_mean
+- haar2d_lateral_center_surround_h16_w8_direct_diff_std
+- haar2d_lateral_center_surround_h16_w8_direct_diff_max
+- haar2d_lateral_center_surround_h16_w8_direct_diff_min
+- haar2d_lateral_center_surround_h16_w8_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w8_direct_diff_max_abs
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_mean
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_std
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_max
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_min
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w8_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h16_w8_direct_corr
+- haar2d_lateral_center_surround_h16_w8_reverse_corr
+- haar2d_lateral_center_surround_h16_w8_reverse_gain
+- haar2d_axial_step_h16_w16_left_mean
+- haar2d_axial_step_h16_w16_left_std
+- haar2d_axial_step_h16_w16_left_max
+- haar2d_axial_step_h16_w16_left_min
+- haar2d_axial_step_h16_w16_left_mean_abs
+- haar2d_axial_step_h16_w16_left_max_abs
+- haar2d_axial_step_h16_w16_right_mean
+- haar2d_axial_step_h16_w16_right_std
+- haar2d_axial_step_h16_w16_right_max
+- haar2d_axial_step_h16_w16_right_min
+- haar2d_axial_step_h16_w16_right_mean_abs
+- haar2d_axial_step_h16_w16_right_max_abs
+- haar2d_axial_step_h16_w16_direct_diff_mean
+- haar2d_axial_step_h16_w16_direct_diff_std
+- haar2d_axial_step_h16_w16_direct_diff_max
+- haar2d_axial_step_h16_w16_direct_diff_min
+- haar2d_axial_step_h16_w16_direct_diff_mean_abs
+- haar2d_axial_step_h16_w16_direct_diff_max_abs
+- haar2d_axial_step_h16_w16_reverse_diff_mean
+- haar2d_axial_step_h16_w16_reverse_diff_std
+- haar2d_axial_step_h16_w16_reverse_diff_max
+- haar2d_axial_step_h16_w16_reverse_diff_min
+- haar2d_axial_step_h16_w16_reverse_diff_mean_abs
+- haar2d_axial_step_h16_w16_reverse_diff_max_abs
+- haar2d_axial_step_h16_w16_direct_corr
+- haar2d_axial_step_h16_w16_reverse_corr
+- haar2d_axial_step_h16_w16_reverse_gain
+- haar2d_lateral_step_h16_w16_left_mean
+- haar2d_lateral_step_h16_w16_left_std
+- haar2d_lateral_step_h16_w16_left_max
+- haar2d_lateral_step_h16_w16_left_min
+- haar2d_lateral_step_h16_w16_left_mean_abs
+- haar2d_lateral_step_h16_w16_left_max_abs
+- haar2d_lateral_step_h16_w16_right_mean
+- haar2d_lateral_step_h16_w16_right_std
+- haar2d_lateral_step_h16_w16_right_max
+- haar2d_lateral_step_h16_w16_right_min
+- haar2d_lateral_step_h16_w16_right_mean_abs
+- haar2d_lateral_step_h16_w16_right_max_abs
+- haar2d_lateral_step_h16_w16_direct_diff_mean
+- haar2d_lateral_step_h16_w16_direct_diff_std
+- haar2d_lateral_step_h16_w16_direct_diff_max
+- haar2d_lateral_step_h16_w16_direct_diff_min
+- haar2d_lateral_step_h16_w16_direct_diff_mean_abs
+- haar2d_lateral_step_h16_w16_direct_diff_max_abs
+- haar2d_lateral_step_h16_w16_reverse_diff_mean
+- haar2d_lateral_step_h16_w16_reverse_diff_std
+- haar2d_lateral_step_h16_w16_reverse_diff_max
+- haar2d_lateral_step_h16_w16_reverse_diff_min
+- haar2d_lateral_step_h16_w16_reverse_diff_mean_abs
+- haar2d_lateral_step_h16_w16_reverse_diff_max_abs
+- haar2d_lateral_step_h16_w16_direct_corr
+- haar2d_lateral_step_h16_w16_reverse_corr
+- haar2d_lateral_step_h16_w16_reverse_gain
+- haar2d_checker_h16_w16_left_mean
+- haar2d_checker_h16_w16_left_std
+- haar2d_checker_h16_w16_left_max
+- haar2d_checker_h16_w16_left_min
+- haar2d_checker_h16_w16_left_mean_abs
+- haar2d_checker_h16_w16_left_max_abs
+- haar2d_checker_h16_w16_right_mean
+- haar2d_checker_h16_w16_right_std
+- haar2d_checker_h16_w16_right_max
+- haar2d_checker_h16_w16_right_min
+- haar2d_checker_h16_w16_right_mean_abs
+- haar2d_checker_h16_w16_right_max_abs
+- haar2d_checker_h16_w16_direct_diff_mean
+- haar2d_checker_h16_w16_direct_diff_std
+- haar2d_checker_h16_w16_direct_diff_max
+- haar2d_checker_h16_w16_direct_diff_min
+- haar2d_checker_h16_w16_direct_diff_mean_abs
+- haar2d_checker_h16_w16_direct_diff_max_abs
+- haar2d_checker_h16_w16_reverse_diff_mean
+- haar2d_checker_h16_w16_reverse_diff_std
+- haar2d_checker_h16_w16_reverse_diff_max
+- haar2d_checker_h16_w16_reverse_diff_min
+- haar2d_checker_h16_w16_reverse_diff_mean_abs
+- haar2d_checker_h16_w16_reverse_diff_max_abs
+- haar2d_checker_h16_w16_direct_corr
+- haar2d_checker_h16_w16_reverse_corr
+- haar2d_checker_h16_w16_reverse_gain
+- haar2d_axial_center_surround_h16_w16_left_mean
+- haar2d_axial_center_surround_h16_w16_left_std
+- haar2d_axial_center_surround_h16_w16_left_max
+- haar2d_axial_center_surround_h16_w16_left_min
+- haar2d_axial_center_surround_h16_w16_left_mean_abs
+- haar2d_axial_center_surround_h16_w16_left_max_abs
+- haar2d_axial_center_surround_h16_w16_right_mean
+- haar2d_axial_center_surround_h16_w16_right_std
+- haar2d_axial_center_surround_h16_w16_right_max
+- haar2d_axial_center_surround_h16_w16_right_min
+- haar2d_axial_center_surround_h16_w16_right_mean_abs
+- haar2d_axial_center_surround_h16_w16_right_max_abs
+- haar2d_axial_center_surround_h16_w16_direct_diff_mean
+- haar2d_axial_center_surround_h16_w16_direct_diff_std
+- haar2d_axial_center_surround_h16_w16_direct_diff_max
+- haar2d_axial_center_surround_h16_w16_direct_diff_min
+- haar2d_axial_center_surround_h16_w16_direct_diff_mean_abs
+- haar2d_axial_center_surround_h16_w16_direct_diff_max_abs
+- haar2d_axial_center_surround_h16_w16_reverse_diff_mean
+- haar2d_axial_center_surround_h16_w16_reverse_diff_std
+- haar2d_axial_center_surround_h16_w16_reverse_diff_max
+- haar2d_axial_center_surround_h16_w16_reverse_diff_min
+- haar2d_axial_center_surround_h16_w16_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h16_w16_reverse_diff_max_abs
+- haar2d_axial_center_surround_h16_w16_direct_corr
+- haar2d_axial_center_surround_h16_w16_reverse_corr
+- haar2d_axial_center_surround_h16_w16_reverse_gain
+- haar2d_lateral_center_surround_h16_w16_left_mean
+- haar2d_lateral_center_surround_h16_w16_left_std
+- haar2d_lateral_center_surround_h16_w16_left_max
+- haar2d_lateral_center_surround_h16_w16_left_min
+- haar2d_lateral_center_surround_h16_w16_left_mean_abs
+- haar2d_lateral_center_surround_h16_w16_left_max_abs
+- haar2d_lateral_center_surround_h16_w16_right_mean
+- haar2d_lateral_center_surround_h16_w16_right_std
+- haar2d_lateral_center_surround_h16_w16_right_max
+- haar2d_lateral_center_surround_h16_w16_right_min
+- haar2d_lateral_center_surround_h16_w16_right_mean_abs
+- haar2d_lateral_center_surround_h16_w16_right_max_abs
+- haar2d_lateral_center_surround_h16_w16_direct_diff_mean
+- haar2d_lateral_center_surround_h16_w16_direct_diff_std
+- haar2d_lateral_center_surround_h16_w16_direct_diff_max
+- haar2d_lateral_center_surround_h16_w16_direct_diff_min
+- haar2d_lateral_center_surround_h16_w16_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w16_direct_diff_max_abs
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_mean
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_std
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_max
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_min
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w16_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h16_w16_direct_corr
+- haar2d_lateral_center_surround_h16_w16_reverse_corr
+- haar2d_lateral_center_surround_h16_w16_reverse_gain
+- haar2d_axial_step_h16_w32_left_mean
+- haar2d_axial_step_h16_w32_left_std
+- haar2d_axial_step_h16_w32_left_max
+- haar2d_axial_step_h16_w32_left_min
+- haar2d_axial_step_h16_w32_left_mean_abs
+- haar2d_axial_step_h16_w32_left_max_abs
+- haar2d_axial_step_h16_w32_right_mean
+- haar2d_axial_step_h16_w32_right_std
+- haar2d_axial_step_h16_w32_right_max
+- haar2d_axial_step_h16_w32_right_min
+- haar2d_axial_step_h16_w32_right_mean_abs
+- haar2d_axial_step_h16_w32_right_max_abs
+- haar2d_axial_step_h16_w32_direct_diff_mean
+- haar2d_axial_step_h16_w32_direct_diff_std
+- haar2d_axial_step_h16_w32_direct_diff_max
+- haar2d_axial_step_h16_w32_direct_diff_min
+- haar2d_axial_step_h16_w32_direct_diff_mean_abs
+- haar2d_axial_step_h16_w32_direct_diff_max_abs
+- haar2d_axial_step_h16_w32_reverse_diff_mean
+- haar2d_axial_step_h16_w32_reverse_diff_std
+- haar2d_axial_step_h16_w32_reverse_diff_max
+- haar2d_axial_step_h16_w32_reverse_diff_min
+- haar2d_axial_step_h16_w32_reverse_diff_mean_abs
+- haar2d_axial_step_h16_w32_reverse_diff_max_abs
+- haar2d_axial_step_h16_w32_direct_corr
+- haar2d_axial_step_h16_w32_reverse_corr
+- haar2d_axial_step_h16_w32_reverse_gain
+- haar2d_lateral_step_h16_w32_left_mean
+- haar2d_lateral_step_h16_w32_left_std
+- haar2d_lateral_step_h16_w32_left_max
+- haar2d_lateral_step_h16_w32_left_min
+- haar2d_lateral_step_h16_w32_left_mean_abs
+- haar2d_lateral_step_h16_w32_left_max_abs
+- haar2d_lateral_step_h16_w32_right_mean
+- haar2d_lateral_step_h16_w32_right_std
+- haar2d_lateral_step_h16_w32_right_max
+- haar2d_lateral_step_h16_w32_right_min
+- haar2d_lateral_step_h16_w32_right_mean_abs
+- haar2d_lateral_step_h16_w32_right_max_abs
+- haar2d_lateral_step_h16_w32_direct_diff_mean
+- haar2d_lateral_step_h16_w32_direct_diff_std
+- haar2d_lateral_step_h16_w32_direct_diff_max
+- haar2d_lateral_step_h16_w32_direct_diff_min
+- haar2d_lateral_step_h16_w32_direct_diff_mean_abs
+- haar2d_lateral_step_h16_w32_direct_diff_max_abs
+- haar2d_lateral_step_h16_w32_reverse_diff_mean
+- haar2d_lateral_step_h16_w32_reverse_diff_std
+- haar2d_lateral_step_h16_w32_reverse_diff_max
+- haar2d_lateral_step_h16_w32_reverse_diff_min
+- haar2d_lateral_step_h16_w32_reverse_diff_mean_abs
+- haar2d_lateral_step_h16_w32_reverse_diff_max_abs
+- haar2d_lateral_step_h16_w32_direct_corr
+- haar2d_lateral_step_h16_w32_reverse_corr
+- haar2d_lateral_step_h16_w32_reverse_gain
+- haar2d_checker_h16_w32_left_mean
+- haar2d_checker_h16_w32_left_std
+- haar2d_checker_h16_w32_left_max
+- haar2d_checker_h16_w32_left_min
+- haar2d_checker_h16_w32_left_mean_abs
+- haar2d_checker_h16_w32_left_max_abs
+- haar2d_checker_h16_w32_right_mean
+- haar2d_checker_h16_w32_right_std
+- haar2d_checker_h16_w32_right_max
+- haar2d_checker_h16_w32_right_min
+- haar2d_checker_h16_w32_right_mean_abs
+- haar2d_checker_h16_w32_right_max_abs
+- haar2d_checker_h16_w32_direct_diff_mean
+- haar2d_checker_h16_w32_direct_diff_std
+- haar2d_checker_h16_w32_direct_diff_max
+- haar2d_checker_h16_w32_direct_diff_min
+- haar2d_checker_h16_w32_direct_diff_mean_abs
+- haar2d_checker_h16_w32_direct_diff_max_abs
+- haar2d_checker_h16_w32_reverse_diff_mean
+- haar2d_checker_h16_w32_reverse_diff_std
+- haar2d_checker_h16_w32_reverse_diff_max
+- haar2d_checker_h16_w32_reverse_diff_min
+- haar2d_checker_h16_w32_reverse_diff_mean_abs
+- haar2d_checker_h16_w32_reverse_diff_max_abs
+- haar2d_checker_h16_w32_direct_corr
+- haar2d_checker_h16_w32_reverse_corr
+- haar2d_checker_h16_w32_reverse_gain
+- haar2d_axial_center_surround_h16_w32_left_mean
+- haar2d_axial_center_surround_h16_w32_left_std
+- haar2d_axial_center_surround_h16_w32_left_max
+- haar2d_axial_center_surround_h16_w32_left_min
+- haar2d_axial_center_surround_h16_w32_left_mean_abs
+- haar2d_axial_center_surround_h16_w32_left_max_abs
+- haar2d_axial_center_surround_h16_w32_right_mean
+- haar2d_axial_center_surround_h16_w32_right_std
+- haar2d_axial_center_surround_h16_w32_right_max
+- haar2d_axial_center_surround_h16_w32_right_min
+- haar2d_axial_center_surround_h16_w32_right_mean_abs
+- haar2d_axial_center_surround_h16_w32_right_max_abs
+- haar2d_axial_center_surround_h16_w32_direct_diff_mean
+- haar2d_axial_center_surround_h16_w32_direct_diff_std
+- haar2d_axial_center_surround_h16_w32_direct_diff_max
+- haar2d_axial_center_surround_h16_w32_direct_diff_min
+- haar2d_axial_center_surround_h16_w32_direct_diff_mean_abs
+- haar2d_axial_center_surround_h16_w32_direct_diff_max_abs
+- haar2d_axial_center_surround_h16_w32_reverse_diff_mean
+- haar2d_axial_center_surround_h16_w32_reverse_diff_std
+- haar2d_axial_center_surround_h16_w32_reverse_diff_max
+- haar2d_axial_center_surround_h16_w32_reverse_diff_min
+- haar2d_axial_center_surround_h16_w32_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h16_w32_reverse_diff_max_abs
+- haar2d_axial_center_surround_h16_w32_direct_corr
+- haar2d_axial_center_surround_h16_w32_reverse_corr
+- haar2d_axial_center_surround_h16_w32_reverse_gain
+- haar2d_lateral_center_surround_h16_w32_left_mean
+- haar2d_lateral_center_surround_h16_w32_left_std
+- haar2d_lateral_center_surround_h16_w32_left_max
+- haar2d_lateral_center_surround_h16_w32_left_min
+- haar2d_lateral_center_surround_h16_w32_left_mean_abs
+- haar2d_lateral_center_surround_h16_w32_left_max_abs
+- haar2d_lateral_center_surround_h16_w32_right_mean
+- haar2d_lateral_center_surround_h16_w32_right_std
+- haar2d_lateral_center_surround_h16_w32_right_max
+- haar2d_lateral_center_surround_h16_w32_right_min
+- haar2d_lateral_center_surround_h16_w32_right_mean_abs
+- haar2d_lateral_center_surround_h16_w32_right_max_abs
+- haar2d_lateral_center_surround_h16_w32_direct_diff_mean
+- haar2d_lateral_center_surround_h16_w32_direct_diff_std
+- haar2d_lateral_center_surround_h16_w32_direct_diff_max
+- haar2d_lateral_center_surround_h16_w32_direct_diff_min
+- haar2d_lateral_center_surround_h16_w32_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w32_direct_diff_max_abs
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_mean
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_std
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_max
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_min
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h16_w32_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h16_w32_direct_corr
+- haar2d_lateral_center_surround_h16_w32_reverse_corr
+- haar2d_lateral_center_surround_h16_w32_reverse_gain
+- haar2d_axial_step_h32_w8_left_mean
+- haar2d_axial_step_h32_w8_left_std
+- haar2d_axial_step_h32_w8_left_max
+- haar2d_axial_step_h32_w8_left_min
+- haar2d_axial_step_h32_w8_left_mean_abs
+- haar2d_axial_step_h32_w8_left_max_abs
+- haar2d_axial_step_h32_w8_right_mean
+- haar2d_axial_step_h32_w8_right_std
+- haar2d_axial_step_h32_w8_right_max
+- haar2d_axial_step_h32_w8_right_min
+- haar2d_axial_step_h32_w8_right_mean_abs
+- haar2d_axial_step_h32_w8_right_max_abs
+- haar2d_axial_step_h32_w8_direct_diff_mean
+- haar2d_axial_step_h32_w8_direct_diff_std
+- haar2d_axial_step_h32_w8_direct_diff_max
+- haar2d_axial_step_h32_w8_direct_diff_min
+- haar2d_axial_step_h32_w8_direct_diff_mean_abs
+- haar2d_axial_step_h32_w8_direct_diff_max_abs
+- haar2d_axial_step_h32_w8_reverse_diff_mean
+- haar2d_axial_step_h32_w8_reverse_diff_std
+- haar2d_axial_step_h32_w8_reverse_diff_max
+- haar2d_axial_step_h32_w8_reverse_diff_min
+- haar2d_axial_step_h32_w8_reverse_diff_mean_abs
+- haar2d_axial_step_h32_w8_reverse_diff_max_abs
+- haar2d_axial_step_h32_w8_direct_corr
+- haar2d_axial_step_h32_w8_reverse_corr
+- haar2d_axial_step_h32_w8_reverse_gain
+- haar2d_lateral_step_h32_w8_left_mean
+- haar2d_lateral_step_h32_w8_left_std
+- haar2d_lateral_step_h32_w8_left_max
+- haar2d_lateral_step_h32_w8_left_min
+- haar2d_lateral_step_h32_w8_left_mean_abs
+- haar2d_lateral_step_h32_w8_left_max_abs
+- haar2d_lateral_step_h32_w8_right_mean
+- haar2d_lateral_step_h32_w8_right_std
+- haar2d_lateral_step_h32_w8_right_max
+- haar2d_lateral_step_h32_w8_right_min
+- haar2d_lateral_step_h32_w8_right_mean_abs
+- haar2d_lateral_step_h32_w8_right_max_abs
+- haar2d_lateral_step_h32_w8_direct_diff_mean
+- haar2d_lateral_step_h32_w8_direct_diff_std
+- haar2d_lateral_step_h32_w8_direct_diff_max
+- haar2d_lateral_step_h32_w8_direct_diff_min
+- haar2d_lateral_step_h32_w8_direct_diff_mean_abs
+- haar2d_lateral_step_h32_w8_direct_diff_max_abs
+- haar2d_lateral_step_h32_w8_reverse_diff_mean
+- haar2d_lateral_step_h32_w8_reverse_diff_std
+- haar2d_lateral_step_h32_w8_reverse_diff_max
+- haar2d_lateral_step_h32_w8_reverse_diff_min
+- haar2d_lateral_step_h32_w8_reverse_diff_mean_abs
+- haar2d_lateral_step_h32_w8_reverse_diff_max_abs
+- haar2d_lateral_step_h32_w8_direct_corr
+- haar2d_lateral_step_h32_w8_reverse_corr
+- haar2d_lateral_step_h32_w8_reverse_gain
+- haar2d_checker_h32_w8_left_mean
+- haar2d_checker_h32_w8_left_std
+- haar2d_checker_h32_w8_left_max
+- haar2d_checker_h32_w8_left_min
+- haar2d_checker_h32_w8_left_mean_abs
+- haar2d_checker_h32_w8_left_max_abs
+- haar2d_checker_h32_w8_right_mean
+- haar2d_checker_h32_w8_right_std
+- haar2d_checker_h32_w8_right_max
+- haar2d_checker_h32_w8_right_min
+- haar2d_checker_h32_w8_right_mean_abs
+- haar2d_checker_h32_w8_right_max_abs
+- haar2d_checker_h32_w8_direct_diff_mean
+- haar2d_checker_h32_w8_direct_diff_std
+- haar2d_checker_h32_w8_direct_diff_max
+- haar2d_checker_h32_w8_direct_diff_min
+- haar2d_checker_h32_w8_direct_diff_mean_abs
+- haar2d_checker_h32_w8_direct_diff_max_abs
+- haar2d_checker_h32_w8_reverse_diff_mean
+- haar2d_checker_h32_w8_reverse_diff_std
+- haar2d_checker_h32_w8_reverse_diff_max
+- haar2d_checker_h32_w8_reverse_diff_min
+- haar2d_checker_h32_w8_reverse_diff_mean_abs
+- haar2d_checker_h32_w8_reverse_diff_max_abs
+- haar2d_checker_h32_w8_direct_corr
+- haar2d_checker_h32_w8_reverse_corr
+- haar2d_checker_h32_w8_reverse_gain
+- haar2d_axial_center_surround_h32_w8_left_mean
+- haar2d_axial_center_surround_h32_w8_left_std
+- haar2d_axial_center_surround_h32_w8_left_max
+- haar2d_axial_center_surround_h32_w8_left_min
+- haar2d_axial_center_surround_h32_w8_left_mean_abs
+- haar2d_axial_center_surround_h32_w8_left_max_abs
+- haar2d_axial_center_surround_h32_w8_right_mean
+- haar2d_axial_center_surround_h32_w8_right_std
+- haar2d_axial_center_surround_h32_w8_right_max
+- haar2d_axial_center_surround_h32_w8_right_min
+- haar2d_axial_center_surround_h32_w8_right_mean_abs
+- haar2d_axial_center_surround_h32_w8_right_max_abs
+- haar2d_axial_center_surround_h32_w8_direct_diff_mean
+- haar2d_axial_center_surround_h32_w8_direct_diff_std
+- haar2d_axial_center_surround_h32_w8_direct_diff_max
+- haar2d_axial_center_surround_h32_w8_direct_diff_min
+- haar2d_axial_center_surround_h32_w8_direct_diff_mean_abs
+- haar2d_axial_center_surround_h32_w8_direct_diff_max_abs
+- haar2d_axial_center_surround_h32_w8_reverse_diff_mean
+- haar2d_axial_center_surround_h32_w8_reverse_diff_std
+- haar2d_axial_center_surround_h32_w8_reverse_diff_max
+- haar2d_axial_center_surround_h32_w8_reverse_diff_min
+- haar2d_axial_center_surround_h32_w8_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h32_w8_reverse_diff_max_abs
+- haar2d_axial_center_surround_h32_w8_direct_corr
+- haar2d_axial_center_surround_h32_w8_reverse_corr
+- haar2d_axial_center_surround_h32_w8_reverse_gain
+- haar2d_lateral_center_surround_h32_w8_left_mean
+- haar2d_lateral_center_surround_h32_w8_left_std
+- haar2d_lateral_center_surround_h32_w8_left_max
+- haar2d_lateral_center_surround_h32_w8_left_min
+- haar2d_lateral_center_surround_h32_w8_left_mean_abs
+- haar2d_lateral_center_surround_h32_w8_left_max_abs
+- haar2d_lateral_center_surround_h32_w8_right_mean
+- haar2d_lateral_center_surround_h32_w8_right_std
+- haar2d_lateral_center_surround_h32_w8_right_max
+- haar2d_lateral_center_surround_h32_w8_right_min
+- haar2d_lateral_center_surround_h32_w8_right_mean_abs
+- haar2d_lateral_center_surround_h32_w8_right_max_abs
+- haar2d_lateral_center_surround_h32_w8_direct_diff_mean
+- haar2d_lateral_center_surround_h32_w8_direct_diff_std
+- haar2d_lateral_center_surround_h32_w8_direct_diff_max
+- haar2d_lateral_center_surround_h32_w8_direct_diff_min
+- haar2d_lateral_center_surround_h32_w8_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w8_direct_diff_max_abs
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_mean
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_std
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_max
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_min
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w8_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h32_w8_direct_corr
+- haar2d_lateral_center_surround_h32_w8_reverse_corr
+- haar2d_lateral_center_surround_h32_w8_reverse_gain
+- haar2d_axial_step_h32_w16_left_mean
+- haar2d_axial_step_h32_w16_left_std
+- haar2d_axial_step_h32_w16_left_max
+- haar2d_axial_step_h32_w16_left_min
+- haar2d_axial_step_h32_w16_left_mean_abs
+- haar2d_axial_step_h32_w16_left_max_abs
+- haar2d_axial_step_h32_w16_right_mean
+- haar2d_axial_step_h32_w16_right_std
+- haar2d_axial_step_h32_w16_right_max
+- haar2d_axial_step_h32_w16_right_min
+- haar2d_axial_step_h32_w16_right_mean_abs
+- haar2d_axial_step_h32_w16_right_max_abs
+- haar2d_axial_step_h32_w16_direct_diff_mean
+- haar2d_axial_step_h32_w16_direct_diff_std
+- haar2d_axial_step_h32_w16_direct_diff_max
+- haar2d_axial_step_h32_w16_direct_diff_min
+- haar2d_axial_step_h32_w16_direct_diff_mean_abs
+- haar2d_axial_step_h32_w16_direct_diff_max_abs
+- haar2d_axial_step_h32_w16_reverse_diff_mean
+- haar2d_axial_step_h32_w16_reverse_diff_std
+- haar2d_axial_step_h32_w16_reverse_diff_max
+- haar2d_axial_step_h32_w16_reverse_diff_min
+- haar2d_axial_step_h32_w16_reverse_diff_mean_abs
+- haar2d_axial_step_h32_w16_reverse_diff_max_abs
+- haar2d_axial_step_h32_w16_direct_corr
+- haar2d_axial_step_h32_w16_reverse_corr
+- haar2d_axial_step_h32_w16_reverse_gain
+- haar2d_lateral_step_h32_w16_left_mean
+- haar2d_lateral_step_h32_w16_left_std
+- haar2d_lateral_step_h32_w16_left_max
+- haar2d_lateral_step_h32_w16_left_min
+- haar2d_lateral_step_h32_w16_left_mean_abs
+- haar2d_lateral_step_h32_w16_left_max_abs
+- haar2d_lateral_step_h32_w16_right_mean
+- haar2d_lateral_step_h32_w16_right_std
+- haar2d_lateral_step_h32_w16_right_max
+- haar2d_lateral_step_h32_w16_right_min
+- haar2d_lateral_step_h32_w16_right_mean_abs
+- haar2d_lateral_step_h32_w16_right_max_abs
+- haar2d_lateral_step_h32_w16_direct_diff_mean
+- haar2d_lateral_step_h32_w16_direct_diff_std
+- haar2d_lateral_step_h32_w16_direct_diff_max
+- haar2d_lateral_step_h32_w16_direct_diff_min
+- haar2d_lateral_step_h32_w16_direct_diff_mean_abs
+- haar2d_lateral_step_h32_w16_direct_diff_max_abs
+- haar2d_lateral_step_h32_w16_reverse_diff_mean
+- haar2d_lateral_step_h32_w16_reverse_diff_std
+- haar2d_lateral_step_h32_w16_reverse_diff_max
+- haar2d_lateral_step_h32_w16_reverse_diff_min
+- haar2d_lateral_step_h32_w16_reverse_diff_mean_abs
+- haar2d_lateral_step_h32_w16_reverse_diff_max_abs
+- haar2d_lateral_step_h32_w16_direct_corr
+- haar2d_lateral_step_h32_w16_reverse_corr
+- haar2d_lateral_step_h32_w16_reverse_gain
+- haar2d_checker_h32_w16_left_mean
+- haar2d_checker_h32_w16_left_std
+- haar2d_checker_h32_w16_left_max
+- haar2d_checker_h32_w16_left_min
+- haar2d_checker_h32_w16_left_mean_abs
+- haar2d_checker_h32_w16_left_max_abs
+- haar2d_checker_h32_w16_right_mean
+- haar2d_checker_h32_w16_right_std
+- haar2d_checker_h32_w16_right_max
+- haar2d_checker_h32_w16_right_min
+- haar2d_checker_h32_w16_right_mean_abs
+- haar2d_checker_h32_w16_right_max_abs
+- haar2d_checker_h32_w16_direct_diff_mean
+- haar2d_checker_h32_w16_direct_diff_std
+- haar2d_checker_h32_w16_direct_diff_max
+- haar2d_checker_h32_w16_direct_diff_min
+- haar2d_checker_h32_w16_direct_diff_mean_abs
+- haar2d_checker_h32_w16_direct_diff_max_abs
+- haar2d_checker_h32_w16_reverse_diff_mean
+- haar2d_checker_h32_w16_reverse_diff_std
+- haar2d_checker_h32_w16_reverse_diff_max
+- haar2d_checker_h32_w16_reverse_diff_min
+- haar2d_checker_h32_w16_reverse_diff_mean_abs
+- haar2d_checker_h32_w16_reverse_diff_max_abs
+- haar2d_checker_h32_w16_direct_corr
+- haar2d_checker_h32_w16_reverse_corr
+- haar2d_checker_h32_w16_reverse_gain
+- haar2d_axial_center_surround_h32_w16_left_mean
+- haar2d_axial_center_surround_h32_w16_left_std
+- haar2d_axial_center_surround_h32_w16_left_max
+- haar2d_axial_center_surround_h32_w16_left_min
+- haar2d_axial_center_surround_h32_w16_left_mean_abs
+- haar2d_axial_center_surround_h32_w16_left_max_abs
+- haar2d_axial_center_surround_h32_w16_right_mean
+- haar2d_axial_center_surround_h32_w16_right_std
+- haar2d_axial_center_surround_h32_w16_right_max
+- haar2d_axial_center_surround_h32_w16_right_min
+- haar2d_axial_center_surround_h32_w16_right_mean_abs
+- haar2d_axial_center_surround_h32_w16_right_max_abs
+- haar2d_axial_center_surround_h32_w16_direct_diff_mean
+- haar2d_axial_center_surround_h32_w16_direct_diff_std
+- haar2d_axial_center_surround_h32_w16_direct_diff_max
+- haar2d_axial_center_surround_h32_w16_direct_diff_min
+- haar2d_axial_center_surround_h32_w16_direct_diff_mean_abs
+- haar2d_axial_center_surround_h32_w16_direct_diff_max_abs
+- haar2d_axial_center_surround_h32_w16_reverse_diff_mean
+- haar2d_axial_center_surround_h32_w16_reverse_diff_std
+- haar2d_axial_center_surround_h32_w16_reverse_diff_max
+- haar2d_axial_center_surround_h32_w16_reverse_diff_min
+- haar2d_axial_center_surround_h32_w16_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h32_w16_reverse_diff_max_abs
+- haar2d_axial_center_surround_h32_w16_direct_corr
+- haar2d_axial_center_surround_h32_w16_reverse_corr
+- haar2d_axial_center_surround_h32_w16_reverse_gain
+- haar2d_lateral_center_surround_h32_w16_left_mean
+- haar2d_lateral_center_surround_h32_w16_left_std
+- haar2d_lateral_center_surround_h32_w16_left_max
+- haar2d_lateral_center_surround_h32_w16_left_min
+- haar2d_lateral_center_surround_h32_w16_left_mean_abs
+- haar2d_lateral_center_surround_h32_w16_left_max_abs
+- haar2d_lateral_center_surround_h32_w16_right_mean
+- haar2d_lateral_center_surround_h32_w16_right_std
+- haar2d_lateral_center_surround_h32_w16_right_max
+- haar2d_lateral_center_surround_h32_w16_right_min
+- haar2d_lateral_center_surround_h32_w16_right_mean_abs
+- haar2d_lateral_center_surround_h32_w16_right_max_abs
+- haar2d_lateral_center_surround_h32_w16_direct_diff_mean
+- haar2d_lateral_center_surround_h32_w16_direct_diff_std
+- haar2d_lateral_center_surround_h32_w16_direct_diff_max
+- haar2d_lateral_center_surround_h32_w16_direct_diff_min
+- haar2d_lateral_center_surround_h32_w16_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w16_direct_diff_max_abs
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_mean
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_std
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_max
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_min
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w16_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h32_w16_direct_corr
+- haar2d_lateral_center_surround_h32_w16_reverse_corr
+- haar2d_lateral_center_surround_h32_w16_reverse_gain
+- haar2d_axial_step_h32_w32_left_mean
+- haar2d_axial_step_h32_w32_left_std
+- haar2d_axial_step_h32_w32_left_max
+- haar2d_axial_step_h32_w32_left_min
+- haar2d_axial_step_h32_w32_left_mean_abs
+- haar2d_axial_step_h32_w32_left_max_abs
+- haar2d_axial_step_h32_w32_right_mean
+- haar2d_axial_step_h32_w32_right_std
+- haar2d_axial_step_h32_w32_right_max
+- haar2d_axial_step_h32_w32_right_min
+- haar2d_axial_step_h32_w32_right_mean_abs
+- haar2d_axial_step_h32_w32_right_max_abs
+- haar2d_axial_step_h32_w32_direct_diff_mean
+- haar2d_axial_step_h32_w32_direct_diff_std
+- haar2d_axial_step_h32_w32_direct_diff_max
+- haar2d_axial_step_h32_w32_direct_diff_min
+- haar2d_axial_step_h32_w32_direct_diff_mean_abs
+- haar2d_axial_step_h32_w32_direct_diff_max_abs
+- haar2d_axial_step_h32_w32_reverse_diff_mean
+- haar2d_axial_step_h32_w32_reverse_diff_std
+- haar2d_axial_step_h32_w32_reverse_diff_max
+- haar2d_axial_step_h32_w32_reverse_diff_min
+- haar2d_axial_step_h32_w32_reverse_diff_mean_abs
+- haar2d_axial_step_h32_w32_reverse_diff_max_abs
+- haar2d_axial_step_h32_w32_direct_corr
+- haar2d_axial_step_h32_w32_reverse_corr
+- haar2d_axial_step_h32_w32_reverse_gain
+- haar2d_lateral_step_h32_w32_left_mean
+- haar2d_lateral_step_h32_w32_left_std
+- haar2d_lateral_step_h32_w32_left_max
+- haar2d_lateral_step_h32_w32_left_min
+- haar2d_lateral_step_h32_w32_left_mean_abs
+- haar2d_lateral_step_h32_w32_left_max_abs
+- haar2d_lateral_step_h32_w32_right_mean
+- haar2d_lateral_step_h32_w32_right_std
+- haar2d_lateral_step_h32_w32_right_max
+- haar2d_lateral_step_h32_w32_right_min
+- haar2d_lateral_step_h32_w32_right_mean_abs
+- haar2d_lateral_step_h32_w32_right_max_abs
+- haar2d_lateral_step_h32_w32_direct_diff_mean
+- haar2d_lateral_step_h32_w32_direct_diff_std
+- haar2d_lateral_step_h32_w32_direct_diff_max
+- haar2d_lateral_step_h32_w32_direct_diff_min
+- haar2d_lateral_step_h32_w32_direct_diff_mean_abs
+- haar2d_lateral_step_h32_w32_direct_diff_max_abs
+- haar2d_lateral_step_h32_w32_reverse_diff_mean
+- haar2d_lateral_step_h32_w32_reverse_diff_std
+- haar2d_lateral_step_h32_w32_reverse_diff_max
+- haar2d_lateral_step_h32_w32_reverse_diff_min
+- haar2d_lateral_step_h32_w32_reverse_diff_mean_abs
+- haar2d_lateral_step_h32_w32_reverse_diff_max_abs
+- haar2d_lateral_step_h32_w32_direct_corr
+- haar2d_lateral_step_h32_w32_reverse_corr
+- haar2d_lateral_step_h32_w32_reverse_gain
+- haar2d_checker_h32_w32_left_mean
+- haar2d_checker_h32_w32_left_std
+- haar2d_checker_h32_w32_left_max
+- haar2d_checker_h32_w32_left_min
+- haar2d_checker_h32_w32_left_mean_abs
+- haar2d_checker_h32_w32_left_max_abs
+- haar2d_checker_h32_w32_right_mean
+- haar2d_checker_h32_w32_right_std
+- haar2d_checker_h32_w32_right_max
+- haar2d_checker_h32_w32_right_min
+- haar2d_checker_h32_w32_right_mean_abs
+- haar2d_checker_h32_w32_right_max_abs
+- haar2d_checker_h32_w32_direct_diff_mean
+- haar2d_checker_h32_w32_direct_diff_std
+- haar2d_checker_h32_w32_direct_diff_max
+- haar2d_checker_h32_w32_direct_diff_min
+- haar2d_checker_h32_w32_direct_diff_mean_abs
+- haar2d_checker_h32_w32_direct_diff_max_abs
+- haar2d_checker_h32_w32_reverse_diff_mean
+- haar2d_checker_h32_w32_reverse_diff_std
+- haar2d_checker_h32_w32_reverse_diff_max
+- haar2d_checker_h32_w32_reverse_diff_min
+- haar2d_checker_h32_w32_reverse_diff_mean_abs
+- haar2d_checker_h32_w32_reverse_diff_max_abs
+- haar2d_checker_h32_w32_direct_corr
+- haar2d_checker_h32_w32_reverse_corr
+- haar2d_checker_h32_w32_reverse_gain
+- haar2d_axial_center_surround_h32_w32_left_mean
+- haar2d_axial_center_surround_h32_w32_left_std
+- haar2d_axial_center_surround_h32_w32_left_max
+- haar2d_axial_center_surround_h32_w32_left_min
+- haar2d_axial_center_surround_h32_w32_left_mean_abs
+- haar2d_axial_center_surround_h32_w32_left_max_abs
+- haar2d_axial_center_surround_h32_w32_right_mean
+- haar2d_axial_center_surround_h32_w32_right_std
+- haar2d_axial_center_surround_h32_w32_right_max
+- haar2d_axial_center_surround_h32_w32_right_min
+- haar2d_axial_center_surround_h32_w32_right_mean_abs
+- haar2d_axial_center_surround_h32_w32_right_max_abs
+- haar2d_axial_center_surround_h32_w32_direct_diff_mean
+- haar2d_axial_center_surround_h32_w32_direct_diff_std
+- haar2d_axial_center_surround_h32_w32_direct_diff_max
+- haar2d_axial_center_surround_h32_w32_direct_diff_min
+- haar2d_axial_center_surround_h32_w32_direct_diff_mean_abs
+- haar2d_axial_center_surround_h32_w32_direct_diff_max_abs
+- haar2d_axial_center_surround_h32_w32_reverse_diff_mean
+- haar2d_axial_center_surround_h32_w32_reverse_diff_std
+- haar2d_axial_center_surround_h32_w32_reverse_diff_max
+- haar2d_axial_center_surround_h32_w32_reverse_diff_min
+- haar2d_axial_center_surround_h32_w32_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h32_w32_reverse_diff_max_abs
+- haar2d_axial_center_surround_h32_w32_direct_corr
+- haar2d_axial_center_surround_h32_w32_reverse_corr
+- haar2d_axial_center_surround_h32_w32_reverse_gain
+- haar2d_lateral_center_surround_h32_w32_left_mean
+- haar2d_lateral_center_surround_h32_w32_left_std
+- haar2d_lateral_center_surround_h32_w32_left_max
+- haar2d_lateral_center_surround_h32_w32_left_min
+- haar2d_lateral_center_surround_h32_w32_left_mean_abs
+- haar2d_lateral_center_surround_h32_w32_left_max_abs
+- haar2d_lateral_center_surround_h32_w32_right_mean
+- haar2d_lateral_center_surround_h32_w32_right_std
+- haar2d_lateral_center_surround_h32_w32_right_max
+- haar2d_lateral_center_surround_h32_w32_right_min
+- haar2d_lateral_center_surround_h32_w32_right_mean_abs
+- haar2d_lateral_center_surround_h32_w32_right_max_abs
+- haar2d_lateral_center_surround_h32_w32_direct_diff_mean
+- haar2d_lateral_center_surround_h32_w32_direct_diff_std
+- haar2d_lateral_center_surround_h32_w32_direct_diff_max
+- haar2d_lateral_center_surround_h32_w32_direct_diff_min
+- haar2d_lateral_center_surround_h32_w32_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w32_direct_diff_max_abs
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_mean
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_std
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_max
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_min
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h32_w32_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h32_w32_direct_corr
+- haar2d_lateral_center_surround_h32_w32_reverse_corr
+- haar2d_lateral_center_surround_h32_w32_reverse_gain
+- haar2d_axial_step_h64_w8_left_mean
+- haar2d_axial_step_h64_w8_left_std
+- haar2d_axial_step_h64_w8_left_max
+- haar2d_axial_step_h64_w8_left_min
+- haar2d_axial_step_h64_w8_left_mean_abs
+- haar2d_axial_step_h64_w8_left_max_abs
+- haar2d_axial_step_h64_w8_right_mean
+- haar2d_axial_step_h64_w8_right_std
+- haar2d_axial_step_h64_w8_right_max
+- haar2d_axial_step_h64_w8_right_min
+- haar2d_axial_step_h64_w8_right_mean_abs
+- haar2d_axial_step_h64_w8_right_max_abs
+- haar2d_axial_step_h64_w8_direct_diff_mean
+- haar2d_axial_step_h64_w8_direct_diff_std
+- haar2d_axial_step_h64_w8_direct_diff_max
+- haar2d_axial_step_h64_w8_direct_diff_min
+- haar2d_axial_step_h64_w8_direct_diff_mean_abs
+- haar2d_axial_step_h64_w8_direct_diff_max_abs
+- haar2d_axial_step_h64_w8_reverse_diff_mean
+- haar2d_axial_step_h64_w8_reverse_diff_std
+- haar2d_axial_step_h64_w8_reverse_diff_max
+- haar2d_axial_step_h64_w8_reverse_diff_min
+- haar2d_axial_step_h64_w8_reverse_diff_mean_abs
+- haar2d_axial_step_h64_w8_reverse_diff_max_abs
+- haar2d_axial_step_h64_w8_direct_corr
+- haar2d_axial_step_h64_w8_reverse_corr
+- haar2d_axial_step_h64_w8_reverse_gain
+- haar2d_lateral_step_h64_w8_left_mean
+- haar2d_lateral_step_h64_w8_left_std
+- haar2d_lateral_step_h64_w8_left_max
+- haar2d_lateral_step_h64_w8_left_min
+- haar2d_lateral_step_h64_w8_left_mean_abs
+- haar2d_lateral_step_h64_w8_left_max_abs
+- haar2d_lateral_step_h64_w8_right_mean
+- haar2d_lateral_step_h64_w8_right_std
+- haar2d_lateral_step_h64_w8_right_max
+- haar2d_lateral_step_h64_w8_right_min
+- haar2d_lateral_step_h64_w8_right_mean_abs
+- haar2d_lateral_step_h64_w8_right_max_abs
+- haar2d_lateral_step_h64_w8_direct_diff_mean
+- haar2d_lateral_step_h64_w8_direct_diff_std
+- haar2d_lateral_step_h64_w8_direct_diff_max
+- haar2d_lateral_step_h64_w8_direct_diff_min
+- haar2d_lateral_step_h64_w8_direct_diff_mean_abs
+- haar2d_lateral_step_h64_w8_direct_diff_max_abs
+- haar2d_lateral_step_h64_w8_reverse_diff_mean
+- haar2d_lateral_step_h64_w8_reverse_diff_std
+- haar2d_lateral_step_h64_w8_reverse_diff_max
+- haar2d_lateral_step_h64_w8_reverse_diff_min
+- haar2d_lateral_step_h64_w8_reverse_diff_mean_abs
+- haar2d_lateral_step_h64_w8_reverse_diff_max_abs
+- haar2d_lateral_step_h64_w8_direct_corr
+- haar2d_lateral_step_h64_w8_reverse_corr
+- haar2d_lateral_step_h64_w8_reverse_gain
+- haar2d_checker_h64_w8_left_mean
+- haar2d_checker_h64_w8_left_std
+- haar2d_checker_h64_w8_left_max
+- haar2d_checker_h64_w8_left_min
+- haar2d_checker_h64_w8_left_mean_abs
+- haar2d_checker_h64_w8_left_max_abs
+- haar2d_checker_h64_w8_right_mean
+- haar2d_checker_h64_w8_right_std
+- haar2d_checker_h64_w8_right_max
+- haar2d_checker_h64_w8_right_min
+- haar2d_checker_h64_w8_right_mean_abs
+- haar2d_checker_h64_w8_right_max_abs
+- haar2d_checker_h64_w8_direct_diff_mean
+- haar2d_checker_h64_w8_direct_diff_std
+- haar2d_checker_h64_w8_direct_diff_max
+- haar2d_checker_h64_w8_direct_diff_min
+- haar2d_checker_h64_w8_direct_diff_mean_abs
+- haar2d_checker_h64_w8_direct_diff_max_abs
+- haar2d_checker_h64_w8_reverse_diff_mean
+- haar2d_checker_h64_w8_reverse_diff_std
+- haar2d_checker_h64_w8_reverse_diff_max
+- haar2d_checker_h64_w8_reverse_diff_min
+- haar2d_checker_h64_w8_reverse_diff_mean_abs
+- haar2d_checker_h64_w8_reverse_diff_max_abs
+- haar2d_checker_h64_w8_direct_corr
+- haar2d_checker_h64_w8_reverse_corr
+- haar2d_checker_h64_w8_reverse_gain
+- haar2d_axial_center_surround_h64_w8_left_mean
+- haar2d_axial_center_surround_h64_w8_left_std
+- haar2d_axial_center_surround_h64_w8_left_max
+- haar2d_axial_center_surround_h64_w8_left_min
+- haar2d_axial_center_surround_h64_w8_left_mean_abs
+- haar2d_axial_center_surround_h64_w8_left_max_abs
+- haar2d_axial_center_surround_h64_w8_right_mean
+- haar2d_axial_center_surround_h64_w8_right_std
+- haar2d_axial_center_surround_h64_w8_right_max
+- haar2d_axial_center_surround_h64_w8_right_min
+- haar2d_axial_center_surround_h64_w8_right_mean_abs
+- haar2d_axial_center_surround_h64_w8_right_max_abs
+- haar2d_axial_center_surround_h64_w8_direct_diff_mean
+- haar2d_axial_center_surround_h64_w8_direct_diff_std
+- haar2d_axial_center_surround_h64_w8_direct_diff_max
+- haar2d_axial_center_surround_h64_w8_direct_diff_min
+- haar2d_axial_center_surround_h64_w8_direct_diff_mean_abs
+- haar2d_axial_center_surround_h64_w8_direct_diff_max_abs
+- haar2d_axial_center_surround_h64_w8_reverse_diff_mean
+- haar2d_axial_center_surround_h64_w8_reverse_diff_std
+- haar2d_axial_center_surround_h64_w8_reverse_diff_max
+- haar2d_axial_center_surround_h64_w8_reverse_diff_min
+- haar2d_axial_center_surround_h64_w8_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h64_w8_reverse_diff_max_abs
+- haar2d_axial_center_surround_h64_w8_direct_corr
+- haar2d_axial_center_surround_h64_w8_reverse_corr
+- haar2d_axial_center_surround_h64_w8_reverse_gain
+- haar2d_lateral_center_surround_h64_w8_left_mean
+- haar2d_lateral_center_surround_h64_w8_left_std
+- haar2d_lateral_center_surround_h64_w8_left_max
+- haar2d_lateral_center_surround_h64_w8_left_min
+- haar2d_lateral_center_surround_h64_w8_left_mean_abs
+- haar2d_lateral_center_surround_h64_w8_left_max_abs
+- haar2d_lateral_center_surround_h64_w8_right_mean
+- haar2d_lateral_center_surround_h64_w8_right_std
+- haar2d_lateral_center_surround_h64_w8_right_max
+- haar2d_lateral_center_surround_h64_w8_right_min
+- haar2d_lateral_center_surround_h64_w8_right_mean_abs
+- haar2d_lateral_center_surround_h64_w8_right_max_abs
+- haar2d_lateral_center_surround_h64_w8_direct_diff_mean
+- haar2d_lateral_center_surround_h64_w8_direct_diff_std
+- haar2d_lateral_center_surround_h64_w8_direct_diff_max
+- haar2d_lateral_center_surround_h64_w8_direct_diff_min
+- haar2d_lateral_center_surround_h64_w8_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w8_direct_diff_max_abs
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_mean
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_std
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_max
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_min
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w8_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h64_w8_direct_corr
+- haar2d_lateral_center_surround_h64_w8_reverse_corr
+- haar2d_lateral_center_surround_h64_w8_reverse_gain
+- haar2d_axial_step_h64_w16_left_mean
+- haar2d_axial_step_h64_w16_left_std
+- haar2d_axial_step_h64_w16_left_max
+- haar2d_axial_step_h64_w16_left_min
+- haar2d_axial_step_h64_w16_left_mean_abs
+- haar2d_axial_step_h64_w16_left_max_abs
+- haar2d_axial_step_h64_w16_right_mean
+- haar2d_axial_step_h64_w16_right_std
+- haar2d_axial_step_h64_w16_right_max
+- haar2d_axial_step_h64_w16_right_min
+- haar2d_axial_step_h64_w16_right_mean_abs
+- haar2d_axial_step_h64_w16_right_max_abs
+- haar2d_axial_step_h64_w16_direct_diff_mean
+- haar2d_axial_step_h64_w16_direct_diff_std
+- haar2d_axial_step_h64_w16_direct_diff_max
+- haar2d_axial_step_h64_w16_direct_diff_min
+- haar2d_axial_step_h64_w16_direct_diff_mean_abs
+- haar2d_axial_step_h64_w16_direct_diff_max_abs
+- haar2d_axial_step_h64_w16_reverse_diff_mean
+- haar2d_axial_step_h64_w16_reverse_diff_std
+- haar2d_axial_step_h64_w16_reverse_diff_max
+- haar2d_axial_step_h64_w16_reverse_diff_min
+- haar2d_axial_step_h64_w16_reverse_diff_mean_abs
+- haar2d_axial_step_h64_w16_reverse_diff_max_abs
+- haar2d_axial_step_h64_w16_direct_corr
+- haar2d_axial_step_h64_w16_reverse_corr
+- haar2d_axial_step_h64_w16_reverse_gain
+- haar2d_lateral_step_h64_w16_left_mean
+- haar2d_lateral_step_h64_w16_left_std
+- haar2d_lateral_step_h64_w16_left_max
+- haar2d_lateral_step_h64_w16_left_min
+- haar2d_lateral_step_h64_w16_left_mean_abs
+- haar2d_lateral_step_h64_w16_left_max_abs
+- haar2d_lateral_step_h64_w16_right_mean
+- haar2d_lateral_step_h64_w16_right_std
+- haar2d_lateral_step_h64_w16_right_max
+- haar2d_lateral_step_h64_w16_right_min
+- haar2d_lateral_step_h64_w16_right_mean_abs
+- haar2d_lateral_step_h64_w16_right_max_abs
+- haar2d_lateral_step_h64_w16_direct_diff_mean
+- haar2d_lateral_step_h64_w16_direct_diff_std
+- haar2d_lateral_step_h64_w16_direct_diff_max
+- haar2d_lateral_step_h64_w16_direct_diff_min
+- haar2d_lateral_step_h64_w16_direct_diff_mean_abs
+- haar2d_lateral_step_h64_w16_direct_diff_max_abs
+- haar2d_lateral_step_h64_w16_reverse_diff_mean
+- haar2d_lateral_step_h64_w16_reverse_diff_std
+- haar2d_lateral_step_h64_w16_reverse_diff_max
+- haar2d_lateral_step_h64_w16_reverse_diff_min
+- haar2d_lateral_step_h64_w16_reverse_diff_mean_abs
+- haar2d_lateral_step_h64_w16_reverse_diff_max_abs
+- haar2d_lateral_step_h64_w16_direct_corr
+- haar2d_lateral_step_h64_w16_reverse_corr
+- haar2d_lateral_step_h64_w16_reverse_gain
+- haar2d_checker_h64_w16_left_mean
+- haar2d_checker_h64_w16_left_std
+- haar2d_checker_h64_w16_left_max
+- haar2d_checker_h64_w16_left_min
+- haar2d_checker_h64_w16_left_mean_abs
+- haar2d_checker_h64_w16_left_max_abs
+- haar2d_checker_h64_w16_right_mean
+- haar2d_checker_h64_w16_right_std
+- haar2d_checker_h64_w16_right_max
+- haar2d_checker_h64_w16_right_min
+- haar2d_checker_h64_w16_right_mean_abs
+- haar2d_checker_h64_w16_right_max_abs
+- haar2d_checker_h64_w16_direct_diff_mean
+- haar2d_checker_h64_w16_direct_diff_std
+- haar2d_checker_h64_w16_direct_diff_max
+- haar2d_checker_h64_w16_direct_diff_min
+- haar2d_checker_h64_w16_direct_diff_mean_abs
+- haar2d_checker_h64_w16_direct_diff_max_abs
+- haar2d_checker_h64_w16_reverse_diff_mean
+- haar2d_checker_h64_w16_reverse_diff_std
+- haar2d_checker_h64_w16_reverse_diff_max
+- haar2d_checker_h64_w16_reverse_diff_min
+- haar2d_checker_h64_w16_reverse_diff_mean_abs
+- haar2d_checker_h64_w16_reverse_diff_max_abs
+- haar2d_checker_h64_w16_direct_corr
+- haar2d_checker_h64_w16_reverse_corr
+- haar2d_checker_h64_w16_reverse_gain
+- haar2d_axial_center_surround_h64_w16_left_mean
+- haar2d_axial_center_surround_h64_w16_left_std
+- haar2d_axial_center_surround_h64_w16_left_max
+- haar2d_axial_center_surround_h64_w16_left_min
+- haar2d_axial_center_surround_h64_w16_left_mean_abs
+- haar2d_axial_center_surround_h64_w16_left_max_abs
+- haar2d_axial_center_surround_h64_w16_right_mean
+- haar2d_axial_center_surround_h64_w16_right_std
+- haar2d_axial_center_surround_h64_w16_right_max
+- haar2d_axial_center_surround_h64_w16_right_min
+- haar2d_axial_center_surround_h64_w16_right_mean_abs
+- haar2d_axial_center_surround_h64_w16_right_max_abs
+- haar2d_axial_center_surround_h64_w16_direct_diff_mean
+- haar2d_axial_center_surround_h64_w16_direct_diff_std
+- haar2d_axial_center_surround_h64_w16_direct_diff_max
+- haar2d_axial_center_surround_h64_w16_direct_diff_min
+- haar2d_axial_center_surround_h64_w16_direct_diff_mean_abs
+- haar2d_axial_center_surround_h64_w16_direct_diff_max_abs
+- haar2d_axial_center_surround_h64_w16_reverse_diff_mean
+- haar2d_axial_center_surround_h64_w16_reverse_diff_std
+- haar2d_axial_center_surround_h64_w16_reverse_diff_max
+- haar2d_axial_center_surround_h64_w16_reverse_diff_min
+- haar2d_axial_center_surround_h64_w16_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h64_w16_reverse_diff_max_abs
+- haar2d_axial_center_surround_h64_w16_direct_corr
+- haar2d_axial_center_surround_h64_w16_reverse_corr
+- haar2d_axial_center_surround_h64_w16_reverse_gain
+- haar2d_lateral_center_surround_h64_w16_left_mean
+- haar2d_lateral_center_surround_h64_w16_left_std
+- haar2d_lateral_center_surround_h64_w16_left_max
+- haar2d_lateral_center_surround_h64_w16_left_min
+- haar2d_lateral_center_surround_h64_w16_left_mean_abs
+- haar2d_lateral_center_surround_h64_w16_left_max_abs
+- haar2d_lateral_center_surround_h64_w16_right_mean
+- haar2d_lateral_center_surround_h64_w16_right_std
+- haar2d_lateral_center_surround_h64_w16_right_max
+- haar2d_lateral_center_surround_h64_w16_right_min
+- haar2d_lateral_center_surround_h64_w16_right_mean_abs
+- haar2d_lateral_center_surround_h64_w16_right_max_abs
+- haar2d_lateral_center_surround_h64_w16_direct_diff_mean
+- haar2d_lateral_center_surround_h64_w16_direct_diff_std
+- haar2d_lateral_center_surround_h64_w16_direct_diff_max
+- haar2d_lateral_center_surround_h64_w16_direct_diff_min
+- haar2d_lateral_center_surround_h64_w16_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w16_direct_diff_max_abs
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_mean
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_std
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_max
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_min
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w16_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h64_w16_direct_corr
+- haar2d_lateral_center_surround_h64_w16_reverse_corr
+- haar2d_lateral_center_surround_h64_w16_reverse_gain
+- haar2d_axial_step_h64_w32_left_mean
+- haar2d_axial_step_h64_w32_left_std
+- haar2d_axial_step_h64_w32_left_max
+- haar2d_axial_step_h64_w32_left_min
+- haar2d_axial_step_h64_w32_left_mean_abs
+- haar2d_axial_step_h64_w32_left_max_abs
+- haar2d_axial_step_h64_w32_right_mean
+- haar2d_axial_step_h64_w32_right_std
+- haar2d_axial_step_h64_w32_right_max
+- haar2d_axial_step_h64_w32_right_min
+- haar2d_axial_step_h64_w32_right_mean_abs
+- haar2d_axial_step_h64_w32_right_max_abs
+- haar2d_axial_step_h64_w32_direct_diff_mean
+- haar2d_axial_step_h64_w32_direct_diff_std
+- haar2d_axial_step_h64_w32_direct_diff_max
+- haar2d_axial_step_h64_w32_direct_diff_min
+- haar2d_axial_step_h64_w32_direct_diff_mean_abs
+- haar2d_axial_step_h64_w32_direct_diff_max_abs
+- haar2d_axial_step_h64_w32_reverse_diff_mean
+- haar2d_axial_step_h64_w32_reverse_diff_std
+- haar2d_axial_step_h64_w32_reverse_diff_max
+- haar2d_axial_step_h64_w32_reverse_diff_min
+- haar2d_axial_step_h64_w32_reverse_diff_mean_abs
+- haar2d_axial_step_h64_w32_reverse_diff_max_abs
+- haar2d_axial_step_h64_w32_direct_corr
+- haar2d_axial_step_h64_w32_reverse_corr
+- haar2d_axial_step_h64_w32_reverse_gain
+- haar2d_lateral_step_h64_w32_left_mean
+- haar2d_lateral_step_h64_w32_left_std
+- haar2d_lateral_step_h64_w32_left_max
+- haar2d_lateral_step_h64_w32_left_min
+- haar2d_lateral_step_h64_w32_left_mean_abs
+- haar2d_lateral_step_h64_w32_left_max_abs
+- haar2d_lateral_step_h64_w32_right_mean
+- haar2d_lateral_step_h64_w32_right_std
+- haar2d_lateral_step_h64_w32_right_max
+- haar2d_lateral_step_h64_w32_right_min
+- haar2d_lateral_step_h64_w32_right_mean_abs
+- haar2d_lateral_step_h64_w32_right_max_abs
+- haar2d_lateral_step_h64_w32_direct_diff_mean
+- haar2d_lateral_step_h64_w32_direct_diff_std
+- haar2d_lateral_step_h64_w32_direct_diff_max
+- haar2d_lateral_step_h64_w32_direct_diff_min
+- haar2d_lateral_step_h64_w32_direct_diff_mean_abs
+- haar2d_lateral_step_h64_w32_direct_diff_max_abs
+- haar2d_lateral_step_h64_w32_reverse_diff_mean
+- haar2d_lateral_step_h64_w32_reverse_diff_std
+- haar2d_lateral_step_h64_w32_reverse_diff_max
+- haar2d_lateral_step_h64_w32_reverse_diff_min
+- haar2d_lateral_step_h64_w32_reverse_diff_mean_abs
+- haar2d_lateral_step_h64_w32_reverse_diff_max_abs
+- haar2d_lateral_step_h64_w32_direct_corr
+- haar2d_lateral_step_h64_w32_reverse_corr
+- haar2d_lateral_step_h64_w32_reverse_gain
+- haar2d_checker_h64_w32_left_mean
+- haar2d_checker_h64_w32_left_std
+- haar2d_checker_h64_w32_left_max
+- haar2d_checker_h64_w32_left_min
+- haar2d_checker_h64_w32_left_mean_abs
+- haar2d_checker_h64_w32_left_max_abs
+- haar2d_checker_h64_w32_right_mean
+- haar2d_checker_h64_w32_right_std
+- haar2d_checker_h64_w32_right_max
+- haar2d_checker_h64_w32_right_min
+- haar2d_checker_h64_w32_right_mean_abs
+- haar2d_checker_h64_w32_right_max_abs
+- haar2d_checker_h64_w32_direct_diff_mean
+- haar2d_checker_h64_w32_direct_diff_std
+- haar2d_checker_h64_w32_direct_diff_max
+- haar2d_checker_h64_w32_direct_diff_min
+- haar2d_checker_h64_w32_direct_diff_mean_abs
+- haar2d_checker_h64_w32_direct_diff_max_abs
+- haar2d_checker_h64_w32_reverse_diff_mean
+- haar2d_checker_h64_w32_reverse_diff_std
+- haar2d_checker_h64_w32_reverse_diff_max
+- haar2d_checker_h64_w32_reverse_diff_min
+- haar2d_checker_h64_w32_reverse_diff_mean_abs
+- haar2d_checker_h64_w32_reverse_diff_max_abs
+- haar2d_checker_h64_w32_direct_corr
+- haar2d_checker_h64_w32_reverse_corr
+- haar2d_checker_h64_w32_reverse_gain
+- haar2d_axial_center_surround_h64_w32_left_mean
+- haar2d_axial_center_surround_h64_w32_left_std
+- haar2d_axial_center_surround_h64_w32_left_max
+- haar2d_axial_center_surround_h64_w32_left_min
+- haar2d_axial_center_surround_h64_w32_left_mean_abs
+- haar2d_axial_center_surround_h64_w32_left_max_abs
+- haar2d_axial_center_surround_h64_w32_right_mean
+- haar2d_axial_center_surround_h64_w32_right_std
+- haar2d_axial_center_surround_h64_w32_right_max
+- haar2d_axial_center_surround_h64_w32_right_min
+- haar2d_axial_center_surround_h64_w32_right_mean_abs
+- haar2d_axial_center_surround_h64_w32_right_max_abs
+- haar2d_axial_center_surround_h64_w32_direct_diff_mean
+- haar2d_axial_center_surround_h64_w32_direct_diff_std
+- haar2d_axial_center_surround_h64_w32_direct_diff_max
+- haar2d_axial_center_surround_h64_w32_direct_diff_min
+- haar2d_axial_center_surround_h64_w32_direct_diff_mean_abs
+- haar2d_axial_center_surround_h64_w32_direct_diff_max_abs
+- haar2d_axial_center_surround_h64_w32_reverse_diff_mean
+- haar2d_axial_center_surround_h64_w32_reverse_diff_std
+- haar2d_axial_center_surround_h64_w32_reverse_diff_max
+- haar2d_axial_center_surround_h64_w32_reverse_diff_min
+- haar2d_axial_center_surround_h64_w32_reverse_diff_mean_abs
+- haar2d_axial_center_surround_h64_w32_reverse_diff_max_abs
+- haar2d_axial_center_surround_h64_w32_direct_corr
+- haar2d_axial_center_surround_h64_w32_reverse_corr
+- haar2d_axial_center_surround_h64_w32_reverse_gain
+- haar2d_lateral_center_surround_h64_w32_left_mean
+- haar2d_lateral_center_surround_h64_w32_left_std
+- haar2d_lateral_center_surround_h64_w32_left_max
+- haar2d_lateral_center_surround_h64_w32_left_min
+- haar2d_lateral_center_surround_h64_w32_left_mean_abs
+- haar2d_lateral_center_surround_h64_w32_left_max_abs
+- haar2d_lateral_center_surround_h64_w32_right_mean
+- haar2d_lateral_center_surround_h64_w32_right_std
+- haar2d_lateral_center_surround_h64_w32_right_max
+- haar2d_lateral_center_surround_h64_w32_right_min
+- haar2d_lateral_center_surround_h64_w32_right_mean_abs
+- haar2d_lateral_center_surround_h64_w32_right_max_abs
+- haar2d_lateral_center_surround_h64_w32_direct_diff_mean
+- haar2d_lateral_center_surround_h64_w32_direct_diff_std
+- haar2d_lateral_center_surround_h64_w32_direct_diff_max
+- haar2d_lateral_center_surround_h64_w32_direct_diff_min
+- haar2d_lateral_center_surround_h64_w32_direct_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w32_direct_diff_max_abs
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_mean
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_std
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_max
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_min
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_mean_abs
+- haar2d_lateral_center_surround_h64_w32_reverse_diff_max_abs
+- haar2d_lateral_center_surround_h64_w32_direct_corr
+- haar2d_lateral_center_surround_h64_w32_reverse_corr
+- haar2d_lateral_center_surround_h64_w32_reverse_gain
+train_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 547
+  normal_count: 487
+  abnormal_count: 60
+- chromosome_id: '10'
+  count: 547
+  normal_count: 515
+  abnormal_count: 32
+- chromosome_id: '11'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '12'
+  count: 547
+  normal_count: 516
+  abnormal_count: 31
+- chromosome_id: '13'
+  count: 547
+  normal_count: 523
+  abnormal_count: 24
+- chromosome_id: '14'
+  count: 547
+  normal_count: 513
+  abnormal_count: 34
+- chromosome_id: '15'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '16'
+  count: 547
+  normal_count: 519
+  abnormal_count: 28
+- chromosome_id: '17'
+  count: 547
+  normal_count: 514
+  abnormal_count: 33
+- chromosome_id: '18'
+  count: 547
+  normal_count: 521
+  abnormal_count: 26
+- chromosome_id: '19'
+  count: 547
+  normal_count: 527
+  abnormal_count: 20
+- chromosome_id: '2'
+  count: 547
+  normal_count: 536
+  abnormal_count: 11
+- chromosome_id: '20'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '21'
+  count: 547
+  normal_count: 522
+  abnormal_count: 25
+- chromosome_id: '22'
+  count: 546
+  normal_count: 525
+  abnormal_count: 21
+- chromosome_id: '3'
+  count: 547
+  normal_count: 511
+  abnormal_count: 36
+- chromosome_id: '4'
+  count: 547
+  normal_count: 531
+  abnormal_count: 16
+- chromosome_id: '5'
+  count: 547
+  normal_count: 517
+  abnormal_count: 30
+- chromosome_id: '6'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: '7'
+  count: 547
+  normal_count: 517
+  abnormal_count: 30
+- chromosome_id: '8'
+  count: 547
+  normal_count: 513
+  abnormal_count: 34
+- chromosome_id: '9'
+  count: 547
+  normal_count: 547
+  abnormal_count: 0
+- chromosome_id: X
+  count: 272
+  normal_count: 272
+  abnormal_count: 0
+val_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 103
+  normal_count: 82
+  abnormal_count: 21
+- chromosome_id: '10'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '11'
+  count: 103
+  normal_count: 76
+  abnormal_count: 27
+- chromosome_id: '12'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '13'
+  count: 103
+  normal_count: 91
+  abnormal_count: 12
+- chromosome_id: '14'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '15'
+  count: 103
+  normal_count: 78
+  abnormal_count: 25
+- chromosome_id: '16'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '17'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '18'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '19'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '2'
+  count: 103
+  normal_count: 93
+  abnormal_count: 10
+- chromosome_id: '20'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '21'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '22'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '3'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '4'
+  count: 103
+  normal_count: 95
+  abnormal_count: 8
+- chromosome_id: '5'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '6'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '7'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '8'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: '9'
+  count: 103
+  normal_count: 103
+  abnormal_count: 0
+- chromosome_id: X
+  count: 93
+  normal_count: 93
+  abnormal_count: 0
+test_distribution_by_chromosome:
+- chromosome_id: '1'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '10'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '11'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '12'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '13'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '14'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '15'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '16'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '17'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '18'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '19'
+  count: 104
+  normal_count: 100
+  abnormal_count: 4
+- chromosome_id: '2'
+  count: 104
+  normal_count: 94
+  abnormal_count: 10
+- chromosome_id: '20'
+  count: 104
+  normal_count: 72
+  abnormal_count: 32
+- chromosome_id: '21'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '22'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '3'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '4'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '5'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '6'
+  count: 104
+  normal_count: 69
+  abnormal_count: 35
+- chromosome_id: '7'
+  count: 104
+  normal_count: 98
+  abnormal_count: 6
+- chromosome_id: '8'
+  count: 104
+  normal_count: 104
+  abnormal_count: 0
+- chromosome_id: '9'
+  count: 104
+  normal_count: 87
+  abnormal_count: 17
+- chromosome_id: X
+  count: 37
+  normal_count: 37
+  abnormal_count: 0
+test_by_subtype_best_threshold:
+- abnormal_subtype_id: 19::inversion
+  chromosome_id: '19'
+  subtype_status: seen
+  count: 4
+  recall_at_threshold: 0.0
+  mean_score: 0.2811191378994618
+  min_score: 0.27037366398957435
+  max_score: 0.28746371868087534
+- abnormal_subtype_id: 20::inversion
+  chromosome_id: '20'
+  subtype_status: unseen
+  count: 32
+  recall_at_threshold: 0.0625
+  mean_score: 0.26904464325620137
+  min_score: 0.20450374602957627
+  max_score: 0.2962087829915336
+- abnormal_subtype_id: 2::inversion
+  chromosome_id: '2'
+  subtype_status: seen
+  count: 10
+  recall_at_threshold: 0.2
+  mean_score: 0.27748774491266726
+  min_score: 0.25664772785354767
+  max_score: 0.2962087829915336
+- abnormal_subtype_id: 6::inversion
+  chromosome_id: '6'
+  subtype_status: unseen
+  count: 35
+  recall_at_threshold: 0.2857142857142857
+  mean_score: 0.2780504542578711
+  min_score: 0.23088064350098367
+  max_score: 0.2962087829915336
+- abnormal_subtype_id: 7::inversion
+  chromosome_id: '7'
+  subtype_status: seen
+  count: 6
+  recall_at_threshold: 0.3333333333333333
+  mean_score: 0.2837327095671661
+  min_score: 0.2679967840379415
+  max_score: 0.2962087829915336
+- abnormal_subtype_id: 9::inversion
+  chromosome_id: '9'
+  subtype_status: unseen
+  count: 17
+  recall_at_threshold: 0.23529411764705882
+  mean_score: 0.2838287838728548
+  min_score: 0.264576271015048
+  max_score: 0.30455610743047207
